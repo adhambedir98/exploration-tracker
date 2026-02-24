@@ -3,6 +3,8 @@ import "./globals.css";
 import { UserProvider } from "@/lib/UserContext";
 import Sidebar from "@/components/Sidebar";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: "Exploration Tracker - Caddy",
   description: "Internal tool for tracking structured industry exploration",
