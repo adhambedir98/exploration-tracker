@@ -1,112 +1,87 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from './supabase';
 import { Vertical, VerticalScore, Conversation, Task, SFMeeting } from './types';
 
-export function useVerticals() {
-  const [data, setData] = useState<Vertical[]>([]);
+function useRealtimeTable<T>(
+  table: string,
+  queryFn: () => Promise<T[]>,
+) {
+  const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(true);
 
-  const fetch = useCallback(async () => {
-    const { data } = await supabase.from('verticals').select('*').order('created_at', { ascending: false });
-    if (data) setData(data as Vertical[]);
-    setLoading(false);
-  }, []);
+  const fetchData = useCallback(async () => {
+    const result = await queryFn();
+    if (mountedRef.current) {
+      setData(result);
+      setLoading(false);
+    }
+  }, [queryFn]);
 
   useEffect(() => {
-    fetch();
-    const channel = supabase.channel('verticals-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'verticals' }, () => fetch())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [fetch]);
+    mountedRef.current = true;
+    fetchData();
 
-  return { data, loading, refetch: fetch };
+    // Realtime subscription
+    const channel = supabase.channel(`${table}-realtime-${Date.now()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    // Polling fallback every 5s in case realtime isn't working
+    const interval = setInterval(fetchData, 5000);
+
+    return () => {
+      mountedRef.current = false;
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [fetchData, table]);
+
+  return { data, loading, refetch: fetchData };
+}
+
+export function useVerticals() {
+  const queryFn = useCallback(async () => {
+    const { data } = await supabase.from('verticals').select('*').order('created_at', { ascending: false });
+    return (data || []) as Vertical[];
+  }, []);
+  return useRealtimeTable('verticals', queryFn);
 }
 
 export function useScores(verticalId?: string) {
-  const [data, setData] = useState<VerticalScore[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetch = useCallback(async () => {
+  const queryFn = useCallback(async () => {
     let query = supabase.from('vertical_scores').select('*');
     if (verticalId) query = query.eq('vertical_id', verticalId);
     const { data } = await query.order('created_at', { ascending: false });
-    if (data) setData(data as VerticalScore[]);
-    setLoading(false);
+    return (data || []) as VerticalScore[];
   }, [verticalId]);
-
-  useEffect(() => {
-    fetch();
-    const channel = supabase.channel(`scores-changes-${verticalId || 'all'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vertical_scores' }, () => fetch())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [fetch, verticalId]);
-
-  return { data, loading, refetch: fetch };
+  return useRealtimeTable('vertical_scores', queryFn);
 }
 
 export function useConversations() {
-  const [data, setData] = useState<Conversation[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetch = useCallback(async () => {
+  const queryFn = useCallback(async () => {
     const { data } = await supabase.from('conversations').select('*').order('date', { ascending: false });
-    if (data) setData(data as Conversation[]);
-    setLoading(false);
+    return (data || []) as Conversation[];
   }, []);
-
-  useEffect(() => {
-    fetch();
-    const channel = supabase.channel('conversations-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => fetch())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [fetch]);
-
-  return { data, loading, refetch: fetch };
+  return useRealtimeTable('conversations', queryFn);
 }
 
 export function useTasks() {
-  const [data, setData] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetch = useCallback(async () => {
+  const queryFn = useCallback(async () => {
     const { data } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
-    if (data) setData(data as Task[]);
-    setLoading(false);
+    return (data || []) as Task[];
   }, []);
-
-  useEffect(() => {
-    fetch();
-    const channel = supabase.channel('tasks-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetch())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [fetch]);
-
-  return { data, loading, refetch: fetch };
+  return useRealtimeTable('tasks', queryFn);
 }
 
 export function useSFMeetings() {
-  const [data, setData] = useState<SFMeeting[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetch = useCallback(async () => {
+  const queryFn = useCallback(async () => {
     const { data } = await supabase.from('sf_meetings').select('*').order('created_at', { ascending: false });
-    if (data) setData(data as SFMeeting[]);
-    setLoading(false);
+    return (data || []) as SFMeeting[];
   }, []);
-
-  useEffect(() => {
-    fetch();
-    const channel = supabase.channel('sf-meetings-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_meetings' }, () => fetch())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [fetch]);
-
-  return { data, loading, refetch: fetch };
+  return useRealtimeTable('sf_meetings', queryFn);
 }
