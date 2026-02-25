@@ -100,8 +100,26 @@ export function useArchetypes() {
 
 export function useReferenceStartups() {
   const queryFn = useCallback(async () => {
-    const { data } = await supabase.from('reference_startups').select('*').order('score', { ascending: false, nullsFirst: false }).limit(3000);
-    return (data || []) as ReferenceStartup[];
+    // Supabase PostgREST defaults to 1000 rows max per request, so paginate
+    const allRows: ReferenceStartup[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const { data } = await supabase
+        .from('reference_startups')
+        .select('*')
+        .order('score', { ascending: false, nullsFirst: false })
+        .range(from, from + pageSize - 1);
+      if (data && data.length > 0) {
+        allRows.push(...(data as ReferenceStartup[]));
+        from += pageSize;
+        hasMore = data.length === pageSize;
+      } else {
+        hasMore = false;
+      }
+    }
+    return allRows;
   }, []);
   return useStaticTable(queryFn);
 }
