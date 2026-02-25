@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useIdeas } from '@/lib/useSupabase';
+import { useIdeas, useArchetypes } from '@/lib/useSupabase';
 import { useUser } from '@/lib/UserContext';
 import { supabase } from '@/lib/supabase';
 import { Idea } from '@/lib/types';
 import Modal from '@/components/Modal';
+import { useSearchParams } from 'next/navigation';
 
 const SCORE_COLUMNS = [
   { key: 'tam_score', reasoningKey: 'tam', label: 'TAM (Total Addressable Market)', short: 'TAM' },
@@ -14,6 +15,23 @@ const SCORE_COLUMNS = [
   { key: 'market_founder_fit_score', reasoningKey: 'market_founder_fit', label: 'Market-Founder Fit', short: 'MF Fit' },
   { key: 'execution_difficulty_score', reasoningKey: 'execution_difficulty', label: 'Execution Difficulty', short: 'Exec' },
 ] as const;
+
+// Funnel step filter definitions
+const FUNNEL_FILTERS = [
+  { key: 'all', label: 'All Ideas' },
+  { key: 'tam_8', label: 'TAM ≥ 8' },
+  { key: 'competition_8', label: '+ Competition ≥ 8' },
+  { key: 'severity_8', label: '+ Severity ≥ 8' },
+  { key: 'fit_8', label: '+ MF Fit ≥ 8' },
+  { key: 'execution_8', label: '+ Exec ≥ 8' },
+  { key: 'shortlist', label: 'Shortlist' },
+  { key: 'deep_dive', label: 'Deep Dive' },
+  { key: 'selected', label: 'Selected' },
+] as const;
+
+type CriterionKey = 'tam_score' | 'competition_score' | 'problem_severity_score' | 'market_founder_fit_score' | 'execution_difficulty_score';
+
+const CASCADING_CRITERIA: CriterionKey[] = ['tam_score', 'competition_score', 'problem_severity_score', 'market_founder_fit_score', 'execution_difficulty_score'];
 
 function scoreColor(val: number | null): string {
   if (val === null) return 'text-dim';
@@ -41,17 +59,74 @@ function totalColor(val: number | null): string {
 
 export default function IdeasPage() {
   const { data: ideas, loading } = useIdeas();
+  const { data: archetypes } = useArchetypes();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { user } = useUser();
+  const searchParams = useSearchParams();
 
   const [sortField, setSortField] = useState<string>('total_score');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [detailIdea, setDetailIdea] = useState<Idea | null>(null);
+  const [compsIdea, setCompsIdea] = useState<Idea | null>(null);
   const [rescoring, setRescoring] = useState<Set<string>>(new Set());
   const [popover, setPopover] = useState<{ ideaId: string; colKey: string; x: number; y: number } | null>(null);
 
+  // Get filter from URL or default to 'all'
+  const urlFilter = searchParams.get('filter') || 'all';
+  const [funnelFilter, setFunnelFilter] = useState(urlFilter);
+
+  // Sync filter from URL changes
+  useEffect(() => {
+    const f = searchParams.get('filter');
+    if (f) setFunnelFilter(f);
+  }, [searchParams]);
+
+  const archetypeMap = useMemo(() => {
+    return Object.fromEntries(archetypes.map(a => [a.id, a.name]));
+  }, [archetypes]);
+
+  // Apply funnel filter
+  const filteredIdeas = useMemo(() => {
+    let filtered = [...ideas];
+
+    switch (funnelFilter) {
+      case 'tam_8':
+        filtered = filtered.filter(i => i.total_score !== null && (i.tam_score || 0) >= 8);
+        break;
+      case 'competition_8':
+        filtered = filtered.filter(i => i.total_score !== null &&
+          CASCADING_CRITERIA.slice(0, 2).every(c => (i[c] || 0) >= 8));
+        break;
+      case 'severity_8':
+        filtered = filtered.filter(i => i.total_score !== null &&
+          CASCADING_CRITERIA.slice(0, 3).every(c => (i[c] || 0) >= 8));
+        break;
+      case 'fit_8':
+        filtered = filtered.filter(i => i.total_score !== null &&
+          CASCADING_CRITERIA.slice(0, 4).every(c => (i[c] || 0) >= 8));
+        break;
+      case 'execution_8':
+        filtered = filtered.filter(i => i.total_score !== null &&
+          CASCADING_CRITERIA.every(c => (i[c] || 0) >= 8));
+        break;
+      case 'shortlist':
+        filtered = filtered.filter(i => i.status === 'shortlist');
+        break;
+      case 'deep_dive':
+        filtered = filtered.filter(i => i.status === 'deep_dive');
+        break;
+      case 'selected':
+        filtered = filtered.filter(i => i.status === 'selected');
+        break;
+      default:
+        break;
+    }
+
+    return filtered;
+  }, [ideas, funnelFilter]);
+
   const sortedIdeas = useMemo(() => {
-    const sorted = [...ideas];
+    const sorted = [...filteredIdeas];
     sorted.sort((a, b) => {
       let cmp = 0;
       if (sortField === 'name') {
@@ -66,7 +141,7 @@ export default function IdeasPage() {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return sorted;
-  }, [ideas, sortField, sortDir]);
+  }, [filteredIdeas, sortField, sortDir]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -102,13 +177,14 @@ export default function IdeasPage() {
   };
 
   const exportCSV = () => {
-    const headers = ['Rank', 'Idea', 'Vertical', ...SCORE_COLUMNS.map(c => c.label), 'Total'];
+    const headers = ['Rank', 'Idea', 'Vertical', 'Archetype', ...SCORE_COLUMNS.map(c => c.label), 'Total'];
     const rows = sortedIdeas.map((idea, i) => {
       const scores = SCORE_COLUMNS.map(c => {
         const val = idea[c.key as keyof Idea] as number | null;
         return val !== null ? String(val) : '-';
       });
-      return [String(i + 1), idea.name, idea.vertical || '-', ...scores, idea.total_score !== null ? String(idea.total_score) : '-'];
+      const arch = idea.archetype_id ? archetypeMap[idea.archetype_id] || '-' : '-';
+      return [String(i + 1), idea.name, idea.vertical || '-', arch, ...scores, idea.total_score !== null ? String(idea.total_score) : '-'];
     });
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -131,14 +207,20 @@ export default function IdeasPage() {
 
   const scoredCount = ideas.filter(i => i.total_score !== null).length;
   const unscoredCount = ideas.length - scoredCount;
+  const activeFilter = FUNNEL_FILTERS.find(f => f.key === funnelFilter);
 
   return (
     <div className="max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-text text-lg font-semibold">Ideas Pipeline</h1>
           <p className="text-muted text-sm mt-1">
-            {ideas.length} ideas &middot; {scoredCount} scored &middot; {unscoredCount} unscored
+            {ideas.length} total &middot; {scoredCount} scored &middot; {unscoredCount} unscored
+            {funnelFilter !== 'all' && (
+              <span className="text-accent ml-2">
+                &middot; Showing {filteredIdeas.length} ({activeFilter?.label})
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -151,14 +233,32 @@ export default function IdeasPage() {
         </div>
       </div>
 
+      {/* Funnel Step Filters */}
+      <div className="flex gap-1.5 mb-4 flex-wrap">
+        {FUNNEL_FILTERS.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFunnelFilter(f.key)}
+            className={`px-2.5 py-1 text-xs rounded transition-colors ${
+              funnelFilter === f.key
+                ? 'bg-accent/20 text-accent border border-accent/30'
+                : 'text-dim hover:text-muted bg-surface/50 border border-transparent hover:border-border'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       <div className="bg-card border border-border rounded overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+          <table className="w-full min-w-[1050px]">
             <thead className="border-b border-border">
               <tr>
                 <th className="text-left px-3 py-2.5 text-xs font-medium text-dim w-10">#</th>
                 <SortHeader field="name" label="Idea" sortField={sortField} sortDir={sortDir} handleSort={handleSort} />
                 <th className="text-left px-3 py-2.5 text-xs font-medium text-dim">Vertical</th>
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-dim">Archetype</th>
                 {SCORE_COLUMNS.map(col => (
                   <SortHeader
                     key={col.key}
@@ -182,13 +282,16 @@ export default function IdeasPage() {
                   <td className="px-3 py-2.5">
                     <button
                       onClick={() => setDetailIdea(idea)}
-                      className="text-sm text-text hover:text-accent transition-colors text-left truncate max-w-[200px] block"
+                      className="text-sm text-text hover:text-accent transition-colors text-left truncate max-w-[180px] block"
                     >
                       {idea.name}
                     </button>
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-dim truncate max-w-[120px]">
+                  <td className="px-3 py-2.5 text-xs text-dim truncate max-w-[100px]">
                     {idea.vertical || '--'}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-dim truncate max-w-[100px]">
+                    {idea.archetype_id ? archetypeMap[idea.archetype_id] || '--' : '--'}
                   </td>
                   {SCORE_COLUMNS.map(col => {
                     const val = idea[col.key as keyof Idea] as number | null;
@@ -224,27 +327,39 @@ export default function IdeasPage() {
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-center">
-                    {rescoring.has(idea.id) ? (
-                      <span className="text-xs text-accent flex items-center justify-center gap-1">
-                        <span className="w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-                        <span>Scoring...</span>
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => rescoreIdea(idea)}
-                        className="text-xs text-muted hover:text-accent transition-colors"
-                        title="Re-score with AI"
-                      >
-                        {idea.total_score !== null ? 'Re-score' : 'Score'}
-                      </button>
-                    )}
+                    <div className="flex items-center justify-center gap-2">
+                      {rescoring.has(idea.id) ? (
+                        <span className="text-xs text-accent flex items-center gap-1">
+                          <span className="w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => rescoreIdea(idea)}
+                            className="text-xs text-muted hover:text-accent transition-colors"
+                            title="Score with AI"
+                          >
+                            {idea.total_score !== null ? 'Re-score' : 'Score'}
+                          </button>
+                          <button
+                            onClick={() => setCompsIdea(idea)}
+                            className="text-xs text-muted hover:text-accent transition-colors"
+                            title="Find comparable startups"
+                          >
+                            Comps
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
-              {ideas.length === 0 && (
+              {sortedIdeas.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-dim text-sm">
-                    No ideas yet. Use the Idea Generator to add ideas to the pipeline.
+                  <td colSpan={10} className="px-3 py-8 text-center text-dim text-sm">
+                    {funnelFilter === 'all'
+                      ? 'No ideas yet. Use the Idea Generator to add ideas to the pipeline.'
+                      : `No ideas match the "${activeFilter?.label}" filter.`}
                   </td>
                 </tr>
               )}
@@ -265,23 +380,81 @@ export default function IdeasPage() {
 
       {/* Score Reasoning Popover */}
       {popover && (
-        <ScorePopover
-          popover={popover}
-          ideas={ideas}
-          onClose={() => setPopover(null)}
-        />
+        <ScorePopover popover={popover} ideas={ideas} onClose={() => setPopover(null)} />
       )}
 
       {/* Detail Modal */}
-      <IdeaDetailModal idea={detailIdea} onClose={() => setDetailIdea(null)} onRescore={rescoreIdea} rescoring={rescoring} />
+      <IdeaDetailModal idea={detailIdea} onClose={() => setDetailIdea(null)} onRescore={rescoreIdea} rescoring={rescoring} archetypeMap={archetypeMap} />
+
+      {/* Comps Modal */}
+      <CompsModal idea={compsIdea} onClose={() => setCompsIdea(null)} />
     </div>
   );
 }
 
+/* ========== Comps Modal ========== */
+function CompsModal({ idea, onClose }: { idea: Idea | null; onClose: () => void }) {
+  const [comps, setComps] = useState<Array<{ company: string; industry: string | null; one_liner: string | null; stage: string | null; amount_raised: string | null; key_investors: string | null; relevance: number }>>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!idea) { setComps([]); return; }
+    setLoading(true);
+    fetch('/api/comps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: idea.name, description: idea.description, vertical: idea.vertical }),
+    })
+      .then(r => r.json())
+      .then(data => { setComps(data.comps || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [idea]);
+
+  if (!idea) return null;
+
+  return (
+    <Modal open={!!idea} onClose={onClose} title={`Comps: ${idea.name}`} wide>
+      <div>
+        <p className="text-xs text-dim mb-4">Comparable startups from the reference database matching this idea&apos;s vertical and keywords.</p>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8 gap-2">
+            <span className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+            <span className="text-sm text-muted">Searching database...</span>
+          </div>
+        ) : comps.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-dim text-sm">No comparable startups found in the database.</p>
+            <p className="text-dim text-xs mt-1">Try adding more detail to the idea description.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {comps.map((comp, i) => (
+              <div key={i} className="bg-surface/50 border border-border/50 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="text-sm font-medium text-text">{comp.company}</h4>
+                  <div className="flex items-center gap-2">
+                    {comp.stage && <span className="text-[10px] text-muted bg-surface px-1.5 py-0.5 rounded">{comp.stage}</span>}
+                    {comp.amount_raised && <span className="text-[10px] text-dim font-mono">{comp.amount_raised}</span>}
+                  </div>
+                </div>
+                {comp.one_liner && <p className="text-xs text-muted">{comp.one_liner}</p>}
+                <div className="flex items-center gap-3 mt-1.5">
+                  {comp.industry && <span className="text-[10px] text-dim">Industry: <span className="text-muted">{comp.industry}</span></span>}
+                  {comp.key_investors && <span className="text-[10px] text-dim truncate">Investors: <span className="text-muted">{comp.key_investors}</span></span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+/* ========== Score Popover ========== */
 function ScorePopover({
-  popover,
-  ideas,
-  onClose,
+  popover, ideas, onClose,
 }: {
   popover: { ideaId: string; colKey: string; x: number; y: number };
   ideas: Idea[];
@@ -295,36 +468,21 @@ function ScorePopover({
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose();
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEsc);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEsc);
-    };
+    return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('keydown', handleEsc); };
   }, [onClose]);
 
-  if (!idea || !col || !reasoning) {
-    onClose();
-    return null;
-  }
+  if (!idea || !col || !reasoning) { onClose(); return null; }
 
-  // Clamp position to viewport
   const left = Math.max(16, Math.min(popover.x - 160, window.innerWidth - 336));
   const top = Math.min(popover.y, window.innerHeight - 120);
 
   return (
-    <div
-      ref={ref}
-      className="fixed z-50 w-80 bg-card border border-border rounded-lg shadow-xl shadow-black/40 p-4 animate-in fade-in"
-      style={{ left: `${left}px`, top: `${top}px` }}
-    >
+    <div ref={ref} className="fixed z-50 w-80 bg-card border border-border rounded-lg shadow-xl shadow-black/40 p-4" style={{ left: `${left}px`, top: `${top}px` }}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className={`text-lg font-mono font-bold ${scoreColor(scoreVal)}`}>{scoreVal}</span>
@@ -333,10 +491,7 @@ function ScorePopover({
         <span className="text-xs font-medium text-muted">{col.label}</span>
       </div>
       <div className="h-1.5 bg-surface rounded-full overflow-hidden mb-3">
-        <div
-          className={`h-full rounded-full ${scoreBg(scoreVal)}`}
-          style={{ width: `${((scoreVal || 0) / 10) * 100}%` }}
-        />
+        <div className={`h-full rounded-full ${scoreBg(scoreVal)}`} style={{ width: `${((scoreVal || 0) / 10) * 100}%` }} />
       </div>
       <p className="text-sm text-muted leading-relaxed">{reasoning}</p>
       <div className="mt-3 pt-2 border-t border-border/50">
@@ -346,6 +501,7 @@ function ScorePopover({
   );
 }
 
+/* ========== Sort Header ========== */
 function SortHeader({
   field, label, sortField, sortDir, handleSort, center, title,
 }: {
@@ -365,13 +521,15 @@ function SortHeader({
   );
 }
 
+/* ========== Detail Modal ========== */
 function IdeaDetailModal({
-  idea, onClose, onRescore, rescoring,
+  idea, onClose, onRescore, rescoring, archetypeMap,
 }: {
   idea: Idea | null;
   onClose: () => void;
   onRescore: (idea: Idea) => void;
   rescoring: Set<string>;
+  archetypeMap: Record<string, string>;
 }) {
   if (!idea) return null;
 
@@ -383,29 +541,28 @@ function IdeaDetailModal({
   const isScoring = rescoring.has(idea.id);
 
   const scores = [
-    { label: 'TAM (Total Addressable Market)', value: idea.tam_score, reasoningKey: 'tam', desc: 'Market size potential' },
-    { label: 'Existing Competition', value: idea.competition_score, reasoningKey: 'competition', desc: 'Higher = less competition' },
-    { label: 'Problem Severity', value: idea.problem_severity_score, reasoningKey: 'problem_severity', desc: 'How painful the problem is' },
-    { label: 'Market-Founder Fit', value: idea.market_founder_fit_score, reasoningKey: 'market_founder_fit', desc: 'Team expertise alignment' },
-    { label: 'Execution Difficulty', value: idea.execution_difficulty_score, reasoningKey: 'execution_difficulty', desc: 'Higher = easier to execute' },
+    { label: 'TAM (Total Addressable Market)', value: idea.tam_score, reasoningKey: 'tam' },
+    { label: 'Existing Competition', value: idea.competition_score, reasoningKey: 'competition' },
+    { label: 'Problem Severity', value: idea.problem_severity_score, reasoningKey: 'problem_severity' },
+    { label: 'Market-Founder Fit', value: idea.market_founder_fit_score, reasoningKey: 'market_founder_fit' },
+    { label: 'Execution Difficulty', value: idea.execution_difficulty_score, reasoningKey: 'execution_difficulty' },
   ];
 
   return (
     <Modal open={!!idea} onClose={onClose} title={idea.name} wide>
       <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          {idea.vertical && (
-            <span className="text-xs text-muted bg-surface px-2 py-0.5 rounded">{idea.vertical}</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          {idea.vertical && <span className="text-xs text-muted bg-surface px-2 py-0.5 rounded">{idea.vertical}</span>}
+          {idea.archetype_id && archetypeMap[idea.archetype_id] && (
+            <span className="text-xs text-muted bg-surface px-2 py-0.5 rounded">{archetypeMap[idea.archetype_id]}</span>
           )}
           <span className="text-xs text-dim">Added by {idea.added_by}</span>
           <span className="text-xs text-dim">Source: {idea.source || 'N/A'}</span>
+          <span className="text-xs text-dim">Status: {idea.status}</span>
         </div>
 
-        {idea.description && (
-          <p className="text-sm text-muted">{idea.description}</p>
-        )}
+        {idea.description && <p className="text-sm text-muted">{idea.description}</p>}
 
-        {/* Score Breakdown */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-medium text-dim uppercase tracking-wide">AI Funnel Scores</h3>
@@ -432,18 +589,13 @@ function IdeaDetailModal({
                 return (
                   <div key={s.label} className="bg-surface/50 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
-                      <div>
-                        <span className="text-sm text-muted">{s.label}</span>
-                      </div>
+                      <span className="text-sm text-muted">{s.label}</span>
                       <span className={`text-sm font-mono font-medium ${scoreColor(s.value)}`}>
                         {s.value !== null ? s.value : '--'}/10
                       </span>
                     </div>
                     <div className="h-1.5 bg-surface rounded-full overflow-hidden mb-2">
-                      <div
-                        className={`h-full rounded-full transition-all ${scoreBg(s.value)}`}
-                        style={{ width: `${((s.value || 0) / 10) * 100}%` }}
-                      />
+                      <div className={`h-full rounded-full transition-all ${scoreBg(s.value)}`} style={{ width: `${((s.value || 0) / 10) * 100}%` }} />
                     </div>
                     {reasoning ? (
                       <p className="text-xs text-dim leading-relaxed">{reasoning}</p>
@@ -456,9 +608,7 @@ function IdeaDetailModal({
               <div className="pt-3 border-t border-border flex items-center justify-between">
                 <span className="text-sm text-text font-medium">Total Score</span>
                 <div>
-                  <span className={`text-xl font-mono font-semibold ${totalColor(idea.total_score)}`}>
-                    {idea.total_score}
-                  </span>
+                  <span className={`text-xl font-mono font-semibold ${totalColor(idea.total_score)}`}>{idea.total_score}</span>
                   <span className="text-dim text-xs font-mono">/50</span>
                 </div>
               </div>
@@ -488,6 +638,7 @@ function IdeaDetailModal({
   );
 }
 
+/* ========== Loading Skeleton ========== */
 function LoadingSkeleton() {
   return (
     <div className="max-w-7xl animate-pulse">
@@ -498,16 +649,22 @@ function LoadingSkeleton() {
         </div>
         <div className="h-8 w-24 bg-surface rounded" />
       </div>
+      <div className="flex gap-2 mb-4">
+        {Array.from({ length: 7 }).map((_, i) => (
+          <div key={i} className="h-7 bg-surface rounded" style={{ width: `${50 + Math.random() * 40}px` }} />
+        ))}
+      </div>
       <div className="bg-card border border-border rounded overflow-hidden">
         <div className="border-b border-border px-3 py-2.5 flex gap-4">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div key={i} className="h-3 bg-surface rounded" style={{ width: `${40 + Math.random() * 40}px` }} />
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="h-3 bg-surface rounded" style={{ width: `${30 + Math.random() * 40}px` }} />
           ))}
         </div>
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="border-b border-border/50 px-3 py-3 flex items-center gap-4">
             <div className="h-3 w-6 bg-surface rounded" />
-            <div className="h-3 bg-surface rounded" style={{ width: `${100 + Math.random() * 80}px` }} />
+            <div className="h-3 bg-surface rounded" style={{ width: `${80 + Math.random() * 60}px` }} />
+            <div className="h-3 w-16 bg-surface rounded" />
             <div className="h-3 w-16 bg-surface rounded" />
             {Array.from({ length: 5 }).map((_, j) => (
               <div key={j} className="h-4 w-8 bg-surface rounded mx-auto" />
