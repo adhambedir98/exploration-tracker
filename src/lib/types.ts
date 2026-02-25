@@ -20,7 +20,21 @@ export interface Idea {
   source: string | null;
   status: IdeaStatus;
   archetype_id: string | null;
+  vertical: string | null;
   added_by: TeamMember;
+  tam_score: number | null;
+  competition_score: number | null;
+  problem_severity_score: number | null;
+  market_founder_fit_score: number | null;
+  execution_difficulty_score: number | null;
+  total_score: number | null;
+  score_reasoning: Record<string, string> | null;
+  created_at: string;
+}
+
+export interface VerticalItem {
+  id: string;
+  name: string;
   created_at: string;
 }
 

@@ -38,7 +38,7 @@ export default function Dashboard() {
   const survivors = funnelData[funnelData.length - 1]?.ideas || [];
 
   if (loading) {
-    return <div className="text-dim text-sm">Loading dashboard...</div>;
+    return <DashboardSkeleton />;
   }
 
   const maxCount = Math.max(...funnelData.map(s => s.count), 1);
@@ -216,6 +216,61 @@ function ScorePill({ label, value }: { label: string; value: number | null }) {
       }`}>
         {value ?? '-'}
       </span>
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="max-w-5xl animate-pulse">
+      <div className="mb-8">
+        <div className="h-5 w-32 bg-surface rounded" />
+        <div className="h-3 w-80 bg-surface rounded mt-2" />
+      </div>
+      <div className="bg-card border border-border rounded-lg p-6 mb-6">
+        <div className="space-y-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="h-3 bg-surface rounded" style={{ width: `${80 + i * 20}px` }} />
+                <div className="h-5 w-6 bg-surface rounded" />
+              </div>
+              <div className="flex justify-center">
+                <div
+                  className="h-10 bg-surface/50 rounded-md"
+                  style={{ width: `${100 - i * 15}%`, minWidth: '40px' }}
+                />
+              </div>
+              {i < 5 && (
+                <div className="flex justify-center py-1">
+                  <div className="w-4 h-3 bg-surface/30 rounded" />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="bg-card border border-border rounded-lg p-4">
+            <div className="h-3 w-20 bg-surface rounded mb-2" />
+            <div className="h-7 w-12 bg-surface rounded" />
+          </div>
+        ))}
+      </div>
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-4 py-3 border-b border-border">
+          <div className="h-4 w-40 bg-surface rounded" />
+        </div>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="px-4 py-3 border-b border-border/50 flex items-center gap-8">
+            <div className="h-3 bg-surface rounded" style={{ width: `${100 + i * 10}px` }} />
+            <div className="h-3 w-8 bg-surface rounded" />
+            <div className="h-3 w-8 bg-surface rounded" />
+            <div className="h-3 w-10 bg-surface rounded" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
