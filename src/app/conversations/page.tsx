@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useConversations, useVerticals } from '@/lib/useSupabase';
+import { useConversations, useIdeas } from '@/lib/useSupabase';
 import { useUser } from '@/lib/UserContext';
 import { supabase } from '@/lib/supabase';
 import { Conversation, SignalStrength, TeamMember } from '@/lib/types';
@@ -10,14 +10,14 @@ import { formatDateET } from '@/lib/utils';
 
 export default function ConversationsPage() {
   const { data: conversations, loading } = useConversations();
-  const { data: verticals } = useVerticals();
+  const { data: ideas } = useIdeas();
   const { user } = useUser();
 
   const [addOpen, setAddOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editConv, setEditConv] = useState<Conversation | null>(null);
 
-  const verticalMap = Object.fromEntries(verticals.map(v => [v.id, v.name]));
+  const ideaMap = Object.fromEntries(ideas.map(i => [i.id, i.name]));
 
   if (loading) return <div className="text-dim text-sm">Loading conversations...</div>;
 
@@ -43,7 +43,7 @@ export default function ConversationsPage() {
               <th className="text-left px-3 py-2 text-xs font-medium text-dim">Date</th>
               <th className="text-left px-3 py-2 text-xs font-medium text-dim">Contact</th>
               <th className="text-left px-3 py-2 text-xs font-medium text-dim">Role / Org</th>
-              <th className="text-left px-3 py-2 text-xs font-medium text-dim">Vertical</th>
+              <th className="text-left px-3 py-2 text-xs font-medium text-dim">Idea</th>
               <th className="text-left px-3 py-2 text-xs font-medium text-dim">By</th>
               <th className="text-left px-3 py-2 text-xs font-medium text-dim">Signal</th>
               <th className="text-left px-3 py-2 text-xs font-medium text-dim">Summary</th>
@@ -63,7 +63,7 @@ export default function ConversationsPage() {
                     {[c.contact_role, c.contact_org].filter(Boolean).join(', ') || '--'}
                   </td>
                   <td className="px-3 py-2.5 text-sm text-muted">
-                    {c.vertical_id ? verticalMap[c.vertical_id] || 'Unknown' : 'General'}
+                    {c.idea_id ? ideaMap[c.idea_id] || 'Unknown' : 'General'}
                   </td>
                   <td className="px-3 py-2.5 text-sm text-muted">{c.conducted_by}</td>
                   <td className="px-3 py-2.5">
@@ -129,7 +129,7 @@ export default function ConversationsPage() {
         open={addOpen || !!editConv}
         onClose={() => { setAddOpen(false); setEditConv(null); }}
         user={user}
-        verticals={verticals}
+        ideas={ideas}
         existing={editConv}
       />
     </div>
@@ -137,32 +137,31 @@ export default function ConversationsPage() {
 }
 
 function ConversationFormModal({
-  open, onClose, user, verticals, existing,
+  open, onClose, user, ideas, existing,
 }: {
   open: boolean;
   onClose: () => void;
   user: TeamMember | null;
-  verticals: { id: string; name: string }[];
+  ideas: { id: string; name: string }[];
   existing: Conversation | null;
 }) {
   const [contactName, setContactName] = useState(existing?.contact_name || '');
   const [contactRole, setContactRole] = useState(existing?.contact_role || '');
   const [contactOrg, setContactOrg] = useState(existing?.contact_org || '');
-  const [verticalId, setVerticalId] = useState(existing?.vertical_id || '');
+  const [ideaId, setIdeaId] = useState(existing?.idea_id || '');
   const [date, setDate] = useState(existing?.date || new Date().toISOString().split('T')[0]);
   const [summary, setSummary] = useState(existing?.summary || '');
   const [rawNotes, setRawNotes] = useState(existing?.raw_notes || '');
   const [signal, setSignal] = useState<SignalStrength | ''>(existing?.signal_strength || '');
   const [submitting, setSubmitting] = useState(false);
 
-  // Sync state when existing changes
   const [lastId, setLastId] = useState<string | null>(null);
   if ((existing?.id || null) !== lastId) {
     setLastId(existing?.id || null);
     setContactName(existing?.contact_name || '');
     setContactRole(existing?.contact_role || '');
     setContactOrg(existing?.contact_org || '');
-    setVerticalId(existing?.vertical_id || '');
+    setIdeaId(existing?.idea_id || '');
     setDate(existing?.date || new Date().toISOString().split('T')[0]);
     setSummary(existing?.summary || '');
     setRawNotes(existing?.raw_notes || '');
@@ -177,7 +176,7 @@ function ConversationFormModal({
       contact_name: contactName.trim(),
       contact_role: contactRole.trim() || null,
       contact_org: contactOrg.trim() || null,
-      vertical_id: verticalId || null,
+      idea_id: ideaId || null,
       conducted_by: user,
       date: date || null,
       summary: summary.trim() || null,
@@ -195,7 +194,7 @@ function ConversationFormModal({
     setContactName('');
     setContactRole('');
     setContactOrg('');
-    setVerticalId('');
+    setIdeaId('');
     setDate(new Date().toISOString().split('T')[0]);
     setSummary('');
     setRawNotes('');
@@ -228,11 +227,11 @@ function ConversationFormModal({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-dim block mb-1">Linked Vertical</label>
-            <select value={verticalId} onChange={e => setVerticalId(e.target.value)} className="w-full">
+            <label className="text-xs text-dim block mb-1">Linked Idea</label>
+            <select value={ideaId} onChange={e => setIdeaId(e.target.value)} className="w-full">
               <option value="">General</option>
-              {verticals.map(v => (
-                <option key={v.id} value={v.id}>{v.name}</option>
+              {ideas.map(i => (
+                <option key={i.id} value={i.id}>{i.name}</option>
               ))}
             </select>
           </div>

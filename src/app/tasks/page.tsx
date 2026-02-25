@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useTasks, useVerticals } from '@/lib/useSupabase';
+import { useTasks, useIdeas } from '@/lib/useSupabase';
 import { useUser } from '@/lib/UserContext';
 import { supabase } from '@/lib/supabase';
 import { Task, TaskStatus, TaskPhase, TeamMember } from '@/lib/types';
@@ -17,7 +17,7 @@ const COLUMNS: { status: TaskStatus; label: string }[] = [
 
 export default function TasksPage() {
   const { data: tasks, loading } = useTasks();
-  const { data: verticals } = useVerticals();
+  const { data: ideas } = useIdeas();
   const { user } = useUser();
 
   const [filterPerson, setFilterPerson] = useState<TeamMember | 'all'>('all');
@@ -34,7 +34,7 @@ export default function TasksPage() {
     return filtered;
   }, [tasks, filterPerson, filterPhase]);
 
-  const verticalMap = Object.fromEntries(verticals.map(v => [v.id, v.name]));
+  const ideaMap = Object.fromEntries(ideas.map(i => [i.id, i.name]));
 
   const moveTask = async (taskId: string, newStatus: TaskStatus) => {
     await supabase.from('tasks').update({ status: newStatus }).eq('id', taskId);
@@ -130,8 +130,8 @@ export default function TasksPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-muted">{task.assigned_to}</span>
                       <Badge value={task.phase} />
-                      {task.vertical_id && verticalMap[task.vertical_id] && (
-                        <span className="text-xs text-dim truncate max-w-[100px]">{verticalMap[task.vertical_id]}</span>
+                      {task.idea_id && ideaMap[task.idea_id] && (
+                        <span className="text-xs text-dim truncate max-w-[100px]">{ideaMap[task.idea_id]}</span>
                       )}
                     </div>
                     {task.due_date && (
@@ -149,7 +149,7 @@ export default function TasksPage() {
         open={addOpen || !!editTask}
         onClose={() => { setAddOpen(false); setEditTask(null); }}
         user={user}
-        verticals={verticals}
+        ideas={ideas}
         defaultStatus={addToColumn}
         existing={editTask}
       />
@@ -158,12 +158,12 @@ export default function TasksPage() {
 }
 
 function TaskFormModal({
-  open, onClose, user, verticals, defaultStatus, existing,
+  open, onClose, user, ideas, defaultStatus, existing,
 }: {
   open: boolean;
   onClose: () => void;
   user: TeamMember | null;
-  verticals: { id: string; name: string }[];
+  ideas: { id: string; name: string }[];
   defaultStatus: TaskStatus;
   existing: Task | null;
 }) {
@@ -173,7 +173,7 @@ function TaskFormModal({
   const [phase, setPhase] = useState<TaskPhase>(existing?.phase || 'phase_1');
   const [dueDate, setDueDate] = useState(existing?.due_date || '');
   const [status, setStatus] = useState<TaskStatus>(existing?.status || defaultStatus);
-  const [verticalId, setVerticalId] = useState(existing?.vertical_id || '');
+  const [ideaId, setIdeaId] = useState(existing?.idea_id || '');
   const [submitting, setSubmitting] = useState(false);
 
   const [lastId, setLastId] = useState<string | null>(null);
@@ -185,7 +185,7 @@ function TaskFormModal({
     setPhase(existing?.phase || 'phase_1');
     setDueDate(existing?.due_date || '');
     setStatus(existing?.status || defaultStatus);
-    setVerticalId(existing?.vertical_id || '');
+    setIdeaId(existing?.idea_id || '');
   }
 
   const handleSubmit = async () => {
@@ -199,7 +199,7 @@ function TaskFormModal({
       phase,
       due_date: dueDate || null,
       status,
-      vertical_id: verticalId || null,
+      idea_id: ideaId || null,
     };
 
     if (existing) {
@@ -212,7 +212,7 @@ function TaskFormModal({
     setTitle('');
     setDescription('');
     setDueDate('');
-    setVerticalId('');
+    setIdeaId('');
     onClose();
   };
 
@@ -268,11 +268,11 @@ function TaskFormModal({
           </div>
         </div>
         <div>
-          <label className="text-xs text-dim block mb-1">Linked Vertical</label>
-          <select value={verticalId} onChange={e => setVerticalId(e.target.value)} className="w-full">
+          <label className="text-xs text-dim block mb-1">Linked Idea</label>
+          <select value={ideaId} onChange={e => setIdeaId(e.target.value)} className="w-full">
             <option value="">None</option>
-            {verticals.map(v => (
-              <option key={v.id} value={v.id}>{v.name}</option>
+            {ideas.map(i => (
+              <option key={i.id} value={i.id}>{i.name}</option>
             ))}
           </select>
         </div>

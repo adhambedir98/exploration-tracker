@@ -6,7 +6,9 @@ import { useUser } from '@/lib/UserContext';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: DashboardIcon },
-  { href: '/verticals', label: 'Verticals', icon: VerticalsIcon },
+  { href: '/ideas', label: 'Ideas', icon: IdeasIcon },
+  { href: '/reference', label: 'Reference DB', icon: ReferenceIcon },
+  { href: '/generate', label: 'AI Generator', icon: GenerateIcon },
   { href: '/conversations', label: 'Conversations', icon: ConversationsIcon },
   { href: '/tasks', label: 'Tasks', icon: TasksIcon },
   { href: '/meetings', label: 'SF Meetings', icon: MeetingsIcon },
@@ -22,7 +24,7 @@ export default function Sidebar() {
     <aside className="w-56 h-screen bg-surface border-r border-border flex flex-col fixed left-0 top-0 z-40">
       <div className="px-4 py-5 border-b border-border">
         <h1 className="text-text text-sm font-semibold tracking-tight">Exploration Tracker</h1>
-        <p className="text-dim text-xs mt-0.5">Caddy - Feb/Mar 2025</p>
+        <p className="text-dim text-xs mt-0.5">Caddy - V2</p>
       </div>
 
       <nav className="flex-1 py-3 px-2">
@@ -66,18 +68,35 @@ export default function Sidebar() {
 function DashboardIcon({ active }: { active: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-accent' : 'text-dim'}>
-      <rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M1 8l7-6 7 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 7v6a1 1 0 001 1h8a1 1 0 001-1V7" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   );
 }
 
-function VerticalsIcon({ active }: { active: boolean }) {
+function IdeasIcon({ active }: { active: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-accent' : 'text-dim'}>
-      <path d="M2 4h12M2 8h12M2 12h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="8" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M6 10.5v2a2 2 0 004 0v-2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M6 13h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ReferenceIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-accent' : 'text-dim'}>
+      <rect x="2" y="1" width="12" height="14" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function GenerateIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-accent' : 'text-dim'}>
+      <path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.5 3.5l2 2M10.5 10.5l2 2M12.5 3.5l-2 2M5.5 10.5l-2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }

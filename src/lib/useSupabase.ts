@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from './supabase';
-import { Vertical, VerticalScore, Conversation, Task, SFMeeting } from './types';
+import { Idea, IdeaScore, Archetype, ReferenceStartup, Conversation, Task, SFMeeting } from './types';
 
 function useRealtimeTable<T>(
   table: string,
@@ -24,14 +24,12 @@ function useRealtimeTable<T>(
     mountedRef.current = true;
     fetchData();
 
-    // Realtime subscription
     const channel = supabase.channel(`${table}-realtime-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
         fetchData();
       })
       .subscribe();
 
-    // Polling fallback every 5s in case realtime isn't working
     const interval = setInterval(fetchData, 5000);
 
     return () => {
@@ -44,22 +42,60 @@ function useRealtimeTable<T>(
   return { data, loading, refetch: fetchData };
 }
 
-export function useVerticals() {
-  const queryFn = useCallback(async () => {
-    const { data } = await supabase.from('verticals').select('*').order('created_at', { ascending: false });
-    return (data || []) as Vertical[];
+// Static table hook (no realtime needed for reference data)
+function useStaticTable<T>(
+  queryFn: () => Promise<T[]>,
+) {
+  const [data, setData] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    queryFn().then(result => {
+      if (mounted) {
+        setData(result);
+        setLoading(false);
+      }
+    });
+    return () => { mounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return useRealtimeTable('verticals', queryFn);
+
+  return { data, loading };
 }
 
-export function useScores(verticalId?: string) {
+export function useIdeas() {
   const queryFn = useCallback(async () => {
-    let query = supabase.from('vertical_scores').select('*');
-    if (verticalId) query = query.eq('vertical_id', verticalId);
+    const { data } = await supabase.from('ideas').select('*').order('created_at', { ascending: false });
+    return (data || []) as Idea[];
+  }, []);
+  return useRealtimeTable('ideas', queryFn);
+}
+
+export function useIdeaScores(ideaId?: string) {
+  const queryFn = useCallback(async () => {
+    let query = supabase.from('idea_scores').select('*');
+    if (ideaId) query = query.eq('idea_id', ideaId);
     const { data } = await query.order('created_at', { ascending: false });
-    return (data || []) as VerticalScore[];
-  }, [verticalId]);
-  return useRealtimeTable('vertical_scores', queryFn);
+    return (data || []) as IdeaScore[];
+  }, [ideaId]);
+  return useRealtimeTable('idea_scores', queryFn);
+}
+
+export function useArchetypes() {
+  const queryFn = useCallback(async () => {
+    const { data } = await supabase.from('archetypes').select('*').order('name');
+    return (data || []) as Archetype[];
+  }, []);
+  return useStaticTable(queryFn);
+}
+
+export function useReferenceStartups() {
+  const queryFn = useCallback(async () => {
+    const { data } = await supabase.from('reference_startups').select('*').order('score', { ascending: false, nullsFirst: false });
+    return (data || []) as ReferenceStartup[];
+  }, []);
+  return useStaticTable(queryFn);
 }
 
 export function useConversations() {

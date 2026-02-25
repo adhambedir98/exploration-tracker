@@ -1,7 +1,8 @@
 'use client';
 
 const statusColors: Record<string, string> = {
-  // Vertical statuses
+  // Idea/Vertical statuses
+  brainstorm: 'bg-violet-500/15 text-violet-400',
   longlist: 'bg-dim/20 text-dim',
   shortlist: 'bg-accent/15 text-accent',
   deep_dive: 'bg-amber-500/15 text-amber-400',
@@ -37,6 +38,7 @@ const statusColors: Record<string, string> = {
 };
 
 const displayLabels: Record<string, string> = {
+  brainstorm: 'Brainstorm',
   longlist: 'Longlist',
   shortlist: 'Shortlist',
   deep_dive: 'Deep Dive',

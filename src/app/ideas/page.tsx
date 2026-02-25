@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { useVerticals, useScores, useConversations } from '@/lib/useSupabase';
+import { useIdeas, useIdeaScores, useConversations, useArchetypes } from '@/lib/useSupabase';
 import { useUser } from '@/lib/UserContext';
 import { supabase } from '@/lib/supabase';
-import { Vertical, VerticalStatus, VerticalScore, TeamMember } from '@/lib/types';
+import { Idea, IdeaStatus, IdeaScore, TeamMember } from '@/lib/types';
 import Badge from '@/components/Badge';
 import Modal from '@/components/Modal';
 import { formatDateET } from '@/lib/utils';
@@ -20,52 +20,57 @@ const SCORE_CRITERIA = [
 
 type ScoreKey = typeof SCORE_CRITERIA[number]['key'];
 
-const STATUS_ORDER: VerticalStatus[] = ['selected', 'deep_dive', 'shortlist', 'longlist', 'killed'];
+const STATUS_ORDER: IdeaStatus[] = ['selected', 'deep_dive', 'shortlist', 'brainstorm', 'killed'];
 
-export default function VerticalsPage() {
-  const { data: verticals, loading } = useVerticals();
-  const { data: allScores } = useScores();
+export default function IdeasPage() {
+  const { data: ideas, loading } = useIdeas();
+  const { data: allScores } = useIdeaScores();
   const { data: conversations } = useConversations();
+  const { data: archetypes } = useArchetypes();
   const { user } = useUser();
 
   const [mode, setMode] = useState<'list' | 'comparison'>('list');
-  const [statusFilter, setStatusFilter] = useState<VerticalStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<IdeaStatus | 'all'>('all');
   const [sortField, setSortField] = useState<string>('status');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [addOpen, setAddOpen] = useState(false);
-  const [detailVertical, setDetailVertical] = useState<Vertical | null>(null);
-  const [scoreVertical, setScoreVertical] = useState<Vertical | null>(null);
+  const [detailIdea, setDetailIdea] = useState<Idea | null>(null);
+  const [scoreIdea, setScoreIdea] = useState<Idea | null>(null);
 
-  const scoresByVertical = useMemo(() => {
-    const map: Record<string, VerticalScore[]> = {};
+  const archetypeMap = useMemo(() => {
+    return Object.fromEntries(archetypes.map(a => [a.id, a.name]));
+  }, [archetypes]);
+
+  const scoresByIdea = useMemo(() => {
+    const map: Record<string, IdeaScore[]> = {};
     allScores.forEach(s => {
-      if (!map[s.vertical_id]) map[s.vertical_id] = [];
-      map[s.vertical_id].push(s);
+      if (!map[s.idea_id]) map[s.idea_id] = [];
+      map[s.idea_id].push(s);
     });
     return map;
   }, [allScores]);
 
-  const convCountByVertical = useMemo(() => {
+  const convCountByIdea = useMemo(() => {
     const map: Record<string, number> = {};
     conversations.forEach(c => {
-      if (c.vertical_id) map[c.vertical_id] = (map[c.vertical_id] || 0) + 1;
+      if (c.idea_id) map[c.idea_id] = (map[c.idea_id] || 0) + 1;
     });
     return map;
   }, [conversations]);
 
-  const avgScoreForVertical = useCallback((vid: string): number => {
-    const scores = scoresByVertical[vid] || [];
+  const avgScoreForIdea = useCallback((ideaId: string): number => {
+    const scores = scoresByIdea[ideaId] || [];
     if (scores.length === 0) return 0;
     const total = scores.reduce((sum, s) => {
       return sum + (s.problem_severity || 0) + (s.willingness_to_pay || 0) + (s.our_edge || 0)
         + (s.moat_potential || 0) + (s.time_to_demo || 0) + (s.market_size || 0);
     }, 0);
     return total / scores.length / 6;
-  }, [scoresByVertical]);
+  }, [scoresByIdea]);
 
-  const filteredVerticals = useMemo(() => {
-    let filtered = [...verticals];
-    if (statusFilter !== 'all') filtered = filtered.filter(v => v.status === statusFilter);
+  const filteredIdeas = useMemo(() => {
+    let filtered = [...ideas];
+    if (statusFilter !== 'all') filtered = filtered.filter(i => i.status === statusFilter);
 
     filtered.sort((a, b) => {
       let cmp = 0;
@@ -76,17 +81,17 @@ export default function VerticalsPage() {
       } else if (sortField === 'added_by') {
         cmp = a.added_by.localeCompare(b.added_by);
       } else if (sortField === 'conversations') {
-        cmp = (convCountByVertical[a.id] || 0) - (convCountByVertical[b.id] || 0);
+        cmp = (convCountByIdea[a.id] || 0) - (convCountByIdea[b.id] || 0);
       } else if (sortField === 'score') {
-        cmp = avgScoreForVertical(a.id) - avgScoreForVertical(b.id);
+        cmp = avgScoreForIdea(a.id) - avgScoreForIdea(b.id);
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
 
     return filtered;
-  }, [verticals, statusFilter, sortField, sortDir, convCountByVertical, avgScoreForVertical]);
+  }, [ideas, statusFilter, sortField, sortDir, convCountByIdea, avgScoreForIdea]);
 
-  const comparisonVerticals = verticals.filter(v => ['shortlist', 'deep_dive', 'selected'].includes(v.status));
+  const comparisonIdeas = ideas.filter(i => ['shortlist', 'deep_dive', 'selected'].includes(i.status));
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -98,36 +103,36 @@ export default function VerticalsPage() {
   };
 
   const exportCSV = () => {
-    const headers = ['Vertical', ...SCORE_CRITERIA.map(c => c.label), 'Avg Total'];
-    const rows = comparisonVerticals.map(v => {
-      const scores = scoresByVertical[v.id] || [];
+    const headers = ['Idea', ...SCORE_CRITERIA.map(c => c.label), 'Avg Total'];
+    const rows = comparisonIdeas.map(idea => {
+      const scores = scoresByIdea[idea.id] || [];
       const avgByCrit = SCORE_CRITERIA.map(c => {
         const vals = scores.map(s => s[c.key] as number).filter(Boolean);
         return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : '-';
       });
-      const avg = avgScoreForVertical(v.id);
-      return [v.name, ...avgByCrit, avg ? avg.toFixed(1) : '-'];
+      const avg = avgScoreForIdea(idea.id);
+      return [idea.name, ...avgByCrit, avg ? avg.toFixed(1) : '-'];
     });
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `verticals-comparison-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `ideas-comparison-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   if (loading) {
-    return <div className="text-dim text-sm">Loading verticals...</div>;
+    return <div className="text-dim text-sm">Loading ideas...</div>;
   }
 
   return (
     <div className="max-w-6xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-text text-lg font-semibold">Verticals</h1>
-          <p className="text-muted text-sm mt-1">{verticals.length} total verticals tracked</p>
+          <h1 className="text-text text-lg font-semibold">Ideas</h1>
+          <p className="text-muted text-sm mt-1">{ideas.length} total ideas in the funnel</p>
         </div>
         <div className="flex items-center gap-2">
           {mode === 'comparison' && (
@@ -153,60 +158,62 @@ export default function VerticalsPage() {
             onClick={() => setAddOpen(true)}
             className="px-3 py-1.5 text-xs bg-accent/15 text-accent rounded hover:bg-accent/25 transition-colors"
           >
-            + Add Vertical
+            + Add Idea
           </button>
         </div>
       </div>
 
       {mode === 'list' ? (
         <ListView
-          verticals={filteredVerticals}
+          ideas={filteredIdeas}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
           sortField={sortField}
           sortDir={sortDir}
           handleSort={handleSort}
-          convCountByVertical={convCountByVertical}
-          avgScoreForVertical={avgScoreForVertical}
-          onDetail={setDetailVertical}
-          onScore={setScoreVertical}
+          convCountByIdea={convCountByIdea}
+          avgScoreForIdea={avgScoreForIdea}
+          archetypeMap={archetypeMap}
+          onDetail={setDetailIdea}
+          onScore={setScoreIdea}
         />
       ) : (
         <ComparisonView
-          verticals={comparisonVerticals}
-          scoresByVertical={scoresByVertical}
-          onScore={setScoreVertical}
+          ideas={comparisonIdeas}
+          scoresByIdea={scoresByIdea}
+          onScore={setScoreIdea}
         />
       )}
 
-      <AddVerticalModal open={addOpen} onClose={() => setAddOpen(false)} user={user} />
-      <VerticalDetailModal
-        vertical={detailVertical}
-        onClose={() => setDetailVertical(null)}
-        scores={detailVertical ? scoresByVertical[detailVertical.id] || [] : []}
-        conversations={detailVertical ? conversations.filter(c => c.vertical_id === detailVertical.id) : []}
-        onScore={() => { if (detailVertical) setScoreVertical(detailVertical); }}
+      <AddIdeaModal open={addOpen} onClose={() => setAddOpen(false)} user={user} archetypes={archetypes} />
+      <IdeaDetailModal
+        idea={detailIdea}
+        onClose={() => setDetailIdea(null)}
+        scores={detailIdea ? scoresByIdea[detailIdea.id] || [] : []}
+        conversations={detailIdea ? conversations.filter(c => c.idea_id === detailIdea.id) : []}
+        archetypeMap={archetypeMap}
+        onScore={() => { if (detailIdea) setScoreIdea(detailIdea); }}
       />
-      <ScoreModal vertical={scoreVertical} onClose={() => setScoreVertical(null)} user={user} existingScores={scoreVertical ? scoresByVertical[scoreVertical.id] || [] : []} />
+      <ScoreModal idea={scoreIdea} onClose={() => setScoreIdea(null)} user={user} existingScores={scoreIdea ? scoresByIdea[scoreIdea.id] || [] : []} />
     </div>
   );
 }
 
-// ===== LIST VIEW =====
 function ListView({
-  verticals, statusFilter, setStatusFilter, sortField, sortDir, handleSort,
-  convCountByVertical, avgScoreForVertical, onDetail, onScore,
+  ideas, statusFilter, setStatusFilter, sortField, sortDir, handleSort,
+  convCountByIdea, avgScoreForIdea, archetypeMap, onDetail, onScore,
 }: {
-  verticals: Vertical[];
-  statusFilter: VerticalStatus | 'all';
-  setStatusFilter: (s: VerticalStatus | 'all') => void;
+  ideas: Idea[];
+  statusFilter: IdeaStatus | 'all';
+  setStatusFilter: (s: IdeaStatus | 'all') => void;
   sortField: string;
   sortDir: 'asc' | 'desc';
   handleSort: (field: string) => void;
-  convCountByVertical: Record<string, number>;
-  avgScoreForVertical: (vid: string) => number;
-  onDetail: (v: Vertical) => void;
-  onScore: (v: Vertical) => void;
+  convCountByIdea: Record<string, number>;
+  avgScoreForIdea: (id: string) => number;
+  archetypeMap: Record<string, string>;
+  onDetail: (i: Idea) => void;
+  onScore: (i: Idea) => void;
 }) {
   const SortHeader = ({ field, label }: { field: string; label: string }) => (
     <th
@@ -223,7 +230,7 @@ function ListView({
   return (
     <div>
       <div className="flex gap-2 mb-4">
-        {(['all', 'longlist', 'shortlist', 'deep_dive', 'killed', 'selected'] as const).map(s => (
+        {(['all', 'brainstorm', 'shortlist', 'deep_dive', 'killed', 'selected'] as const).map(s => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
@@ -239,28 +246,32 @@ function ListView({
           <thead className="border-b border-border">
             <tr>
               <SortHeader field="name" label="Name" />
-              <SortHeader field="status" label="Status" />
+              <SortHeader field="status" label="Stage" />
+              <th className="text-left px-3 py-2 text-xs font-medium text-dim">Archetype</th>
               <SortHeader field="added_by" label="Added By" />
-              <SortHeader field="conversations" label="Conversations" />
+              <SortHeader field="conversations" label="Convos" />
               <SortHeader field="score" label="Avg Score" />
               <th className="text-left px-3 py-2 text-xs font-medium text-dim">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {verticals.map(v => {
-              const avg = avgScoreForVertical(v.id);
-              const convCount = convCountByVertical[v.id] || 0;
+            {ideas.map(idea => {
+              const avg = avgScoreForIdea(idea.id);
+              const convCount = convCountByIdea[idea.id] || 0;
               return (
-                <tr key={v.id} className="border-b border-border/50 hover:bg-surface/50 transition-colors">
+                <tr key={idea.id} className="border-b border-border/50 hover:bg-surface/50 transition-colors">
                   <td className="px-3 py-2.5">
-                    <button onClick={() => onDetail(v)} className="text-sm text-text hover:text-accent transition-colors text-left">
-                      {v.name}
+                    <button onClick={() => onDetail(idea)} className="text-sm text-text hover:text-accent transition-colors text-left">
+                      {idea.name}
                     </button>
                   </td>
                   <td className="px-3 py-2.5">
-                    <StatusSelect vertical={v} />
+                    <StatusSelect idea={idea} />
                   </td>
-                  <td className="px-3 py-2.5 text-sm text-muted">{v.added_by}</td>
+                  <td className="px-3 py-2.5 text-xs text-dim truncate max-w-[120px]">
+                    {idea.archetype_id ? archetypeMap[idea.archetype_id] || '--' : '--'}
+                  </td>
+                  <td className="px-3 py-2.5 text-sm text-muted">{idea.added_by}</td>
                   <td className="px-3 py-2.5 text-sm text-muted font-mono">{convCount}</td>
                   <td className="px-3 py-2.5">
                     {avg > 0 ? (
@@ -271,7 +282,7 @@ function ListView({
                   </td>
                   <td className="px-3 py-2.5">
                     <button
-                      onClick={() => onScore(v)}
+                      onClick={() => onScore(idea)}
                       className="text-xs text-muted hover:text-accent transition-colors"
                     >
                       Score
@@ -280,8 +291,8 @@ function ListView({
                 </tr>
               );
             })}
-            {verticals.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-dim text-sm">No verticals found</td></tr>
+            {ideas.length === 0 && (
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-dim text-sm">No ideas found</td></tr>
             )}
           </tbody>
         </table>
@@ -290,19 +301,18 @@ function ListView({
   );
 }
 
-// ===== STATUS SELECT INLINE =====
-function StatusSelect({ vertical }: { vertical: Vertical }) {
-  const updateStatus = async (newStatus: VerticalStatus) => {
-    await supabase.from('verticals').update({ status: newStatus }).eq('id', vertical.id);
+function StatusSelect({ idea }: { idea: Idea }) {
+  const updateStatus = async (newStatus: IdeaStatus) => {
+    await supabase.from('ideas').update({ status: newStatus }).eq('id', idea.id);
   };
 
   return (
     <select
-      value={vertical.status}
-      onChange={e => updateStatus(e.target.value as VerticalStatus)}
+      value={idea.status}
+      onChange={e => updateStatus(e.target.value as IdeaStatus)}
       className="text-xs !py-1 !px-2 !bg-transparent !border-0 cursor-pointer"
     >
-      <option value="longlist">Longlist</option>
+      <option value="brainstorm">Brainstorm</option>
       <option value="shortlist">Shortlist</option>
       <option value="deep_dive">Deep Dive</option>
       <option value="killed">Killed</option>
@@ -311,18 +321,17 @@ function StatusSelect({ vertical }: { vertical: Vertical }) {
   );
 }
 
-// ===== COMPARISON VIEW =====
 function ComparisonView({
-  verticals, scoresByVertical, onScore,
+  ideas, scoresByIdea, onScore,
 }: {
-  verticals: Vertical[];
-  scoresByVertical: Record<string, VerticalScore[]>;
-  onScore: (v: Vertical) => void;
+  ideas: Idea[];
+  scoresByIdea: Record<string, IdeaScore[]>;
+  onScore: (i: Idea) => void;
 }) {
-  if (verticals.length === 0) {
+  if (ideas.length === 0) {
     return (
       <div className="bg-card border border-border rounded p-8 text-center">
-        <p className="text-dim text-sm">No shortlisted or deep-dive verticals yet. Move verticals to shortlist to compare them.</p>
+        <p className="text-dim text-sm">No shortlisted or deep-dive ideas yet. Move ideas to shortlist to compare them.</p>
       </div>
     );
   }
@@ -330,9 +339,8 @@ function ComparisonView({
   const MEMBERS: TeamMember[] = ['Adham', 'Aly', 'Youssif'];
   const initials: Record<string, string> = { Adham: 'AB', Aly: 'AE', Youssif: 'YS' };
 
-  // Find the leader
-  const avgTotals = verticals.map(v => {
-    const scores = scoresByVertical[v.id] || [];
+  const avgTotals = ideas.map(idea => {
+    const scores = scoresByIdea[idea.id] || [];
     if (scores.length === 0) return 0;
     const total = scores.reduce((sum, s) => {
       return sum + (s.problem_severity || 0) + (s.willingness_to_pay || 0) + (s.our_edge || 0)
@@ -349,11 +357,11 @@ function ComparisonView({
         <thead className="border-b border-border">
           <tr>
             <th className="text-left px-4 py-3 text-xs font-medium text-dim w-48">Criteria</th>
-            {verticals.map((v, i) => (
-              <th key={v.id} className={`text-center px-4 py-3 text-xs font-medium ${i === leaderIdx && maxAvg > 0 ? 'text-accent' : 'text-muted'}`}>
+            {ideas.map((idea, i) => (
+              <th key={idea.id} className={`text-center px-4 py-3 text-xs font-medium ${i === leaderIdx && maxAvg > 0 ? 'text-accent' : 'text-muted'}`}>
                 <div className="flex flex-col items-center gap-1">
-                  <span>{v.name}</span>
-                  <Badge value={v.status} />
+                  <span>{idea.name}</span>
+                  <Badge value={idea.status} />
                 </div>
               </th>
             ))}
@@ -363,10 +371,10 @@ function ComparisonView({
           {SCORE_CRITERIA.map(criterion => (
             <tr key={criterion.key} className="border-b border-border/50">
               <td className="px-4 py-3 text-sm text-muted">{criterion.label}</td>
-              {verticals.map(v => {
-                const scores = scoresByVertical[v.id] || [];
+              {ideas.map(idea => {
+                const scores = scoresByIdea[idea.id] || [];
                 return (
-                  <td key={v.id} className="px-4 py-3 text-center">
+                  <td key={idea.id} className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-2">
                       {MEMBERS.map(member => {
                         const s = scores.find(sc => sc.scored_by === member);
@@ -394,11 +402,10 @@ function ComparisonView({
               })}
             </tr>
           ))}
-          {/* Total row */}
           <tr className="bg-surface/50">
             <td className="px-4 py-3 text-sm text-text font-medium">Total Average</td>
-            {verticals.map((v, i) => (
-              <td key={v.id} className={`px-4 py-3 text-center`}>
+            {ideas.map((idea, i) => (
+              <td key={idea.id} className="px-4 py-3 text-center">
                 <span className={`text-lg font-mono font-semibold ${i === leaderIdx && maxAvg > 0 ? 'text-accent' : 'text-text'}`}>
                   {avgTotals[i] > 0 ? avgTotals[i].toFixed(1) : '--'}
                 </span>
@@ -406,13 +413,12 @@ function ComparisonView({
               </td>
             ))}
           </tr>
-          {/* Score action row */}
           <tr>
             <td className="px-4 py-3"></td>
-            {verticals.map(v => (
-              <td key={v.id} className="px-4 py-3 text-center">
+            {ideas.map(idea => (
+              <td key={idea.id} className="px-4 py-3 text-center">
                 <button
-                  onClick={() => onScore(v)}
+                  onClick={() => onScore(idea)}
                   className="text-xs text-accent hover:text-accent/80 transition-colors"
                 >
                   Add your score
@@ -426,38 +432,40 @@ function ComparisonView({
   );
 }
 
-// ===== ADD VERTICAL MODAL =====
-function AddVerticalModal({ open, onClose, user }: { open: boolean; onClose: () => void; user: TeamMember | null }) {
+function AddIdeaModal({ open, onClose, user, archetypes }: { open: boolean; onClose: () => void; user: TeamMember | null; archetypes: { id: string; name: string }[] }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [source, setSource] = useState('');
-  const [status, setStatus] = useState<VerticalStatus>('longlist');
+  const [status, setStatus] = useState<IdeaStatus>('brainstorm');
+  const [archetypeId, setArchetypeId] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     if (!name.trim() || !user) return;
     setSubmitting(true);
-    await supabase.from('verticals').insert({
+    await supabase.from('ideas').insert({
       name: name.trim(),
       description: description.trim() || null,
       source: source.trim() || null,
       status,
+      archetype_id: archetypeId || null,
       added_by: user,
     });
     setName('');
     setDescription('');
     setSource('');
-    setStatus('longlist');
+    setStatus('brainstorm');
+    setArchetypeId('');
     setSubmitting(false);
     onClose();
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Add Vertical">
+    <Modal open={open} onClose={onClose} title="Add Idea">
       <div className="space-y-4">
         <div>
           <label className="text-xs text-dim block mb-1">Name *</label>
-          <input value={name} onChange={e => setName(e.target.value)} className="w-full" placeholder="e.g. Construction Site Monitoring" />
+          <input value={name} onChange={e => setName(e.target.value)} className="w-full" placeholder="e.g. AI-powered surgical scheduling" />
         </div>
         <div>
           <label className="text-xs text-dim block mb-1">Description</label>
@@ -466,59 +474,70 @@ function AddVerticalModal({ open, onClose, user }: { open: boolean; onClose: () 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-dim block mb-1">Source</label>
-            <input value={source} onChange={e => setSource(e.target.value)} className="w-full" placeholder="database, brainstorm, network..." />
+            <input value={source} onChange={e => setSource(e.target.value)} className="w-full" placeholder="database, brainstorm, AI..." />
           </div>
           <div>
-            <label className="text-xs text-dim block mb-1">Status</label>
-            <select value={status} onChange={e => setStatus(e.target.value as VerticalStatus)} className="w-full">
-              <option value="longlist">Longlist</option>
+            <label className="text-xs text-dim block mb-1">Stage</label>
+            <select value={status} onChange={e => setStatus(e.target.value as IdeaStatus)} className="w-full">
+              <option value="brainstorm">Brainstorm</option>
               <option value="shortlist">Shortlist</option>
               <option value="deep_dive">Deep Dive</option>
             </select>
           </div>
+        </div>
+        <div>
+          <label className="text-xs text-dim block mb-1">Archetype</label>
+          <select value={archetypeId} onChange={e => setArchetypeId(e.target.value)} className="w-full">
+            <option value="">None</option>
+            {archetypes.map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
         </div>
         <button
           onClick={handleSubmit}
           disabled={!name.trim() || submitting}
           className="w-full py-2 text-sm bg-accent/15 text-accent rounded hover:bg-accent/25 transition-colors disabled:opacity-50"
         >
-          {submitting ? 'Adding...' : 'Add Vertical'}
+          {submitting ? 'Adding...' : 'Add Idea'}
         </button>
       </div>
     </Modal>
   );
 }
 
-// ===== VERTICAL DETAIL MODAL =====
-function VerticalDetailModal({
-  vertical, onClose, scores, conversations, onScore,
+function IdeaDetailModal({
+  idea, onClose, scores, conversations, archetypeMap, onScore,
 }: {
-  vertical: Vertical | null;
+  idea: Idea | null;
   onClose: () => void;
-  scores: VerticalScore[];
+  scores: IdeaScore[];
   conversations: { contact_name: string; summary: string | null; signal_strength: string | null; date: string | null }[];
+  archetypeMap: Record<string, string>;
   onScore: () => void;
 }) {
-  if (!vertical) return null;
+  if (!idea) return null;
 
   const handleDelete = async () => {
-    await supabase.from('verticals').delete().eq('id', vertical.id);
+    await supabase.from('ideas').delete().eq('id', idea.id);
     onClose();
   };
 
   return (
-    <Modal open={!!vertical} onClose={onClose} title={vertical.name} wide>
+    <Modal open={!!idea} onClose={onClose} title={idea.name} wide>
       <div className="space-y-5">
         <div className="flex items-center gap-2">
-          <Badge value={vertical.status} />
-          <span className="text-xs text-dim">Added by {vertical.added_by}</span>
+          <Badge value={idea.status} />
+          <span className="text-xs text-dim">Added by {idea.added_by}</span>
+          {idea.archetype_id && archetypeMap[idea.archetype_id] && (
+            <span className="text-xs text-muted bg-surface px-2 py-0.5 rounded">{archetypeMap[idea.archetype_id]}</span>
+          )}
         </div>
 
-        {vertical.description && (
-          <p className="text-sm text-muted">{vertical.description}</p>
+        {idea.description && (
+          <p className="text-sm text-muted">{idea.description}</p>
         )}
 
-        {/* Scores */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xs font-medium text-dim uppercase tracking-wide">Scores</h3>
@@ -545,7 +564,6 @@ function VerticalDetailModal({
           )}
         </div>
 
-        {/* Conversations */}
         <div>
           <h3 className="text-xs font-medium text-dim uppercase tracking-wide mb-2">Linked Conversations</h3>
           {conversations.length === 0 ? (
@@ -568,7 +586,7 @@ function VerticalDetailModal({
 
         <div className="flex justify-end">
           <button onClick={handleDelete} className="text-xs text-red-400 hover:text-red-300 transition-colors">
-            Delete vertical
+            Delete idea
           </button>
         </div>
       </div>
@@ -576,14 +594,13 @@ function VerticalDetailModal({
   );
 }
 
-// ===== SCORE MODAL =====
 function ScoreModal({
-  vertical, onClose, user, existingScores,
+  idea, onClose, user, existingScores,
 }: {
-  vertical: Vertical | null;
+  idea: Idea | null;
   onClose: () => void;
   user: TeamMember | null;
-  existingScores: VerticalScore[];
+  existingScores: IdeaScore[];
 }) {
   const existing = existingScores.find(s => s.scored_by === user);
 
@@ -598,10 +615,9 @@ function ScoreModal({
   const [notes, setNotes] = useState(existing?.notes || '');
   const [submitting, setSubmitting] = useState(false);
 
-  // Reset when vertical changes
-  const [lastVerticalId, setLastVerticalId] = useState<string | null>(null);
-  if (vertical && vertical.id !== lastVerticalId) {
-    setLastVerticalId(vertical.id);
+  const [lastIdeaId, setLastIdeaId] = useState<string | null>(null);
+  if (idea && idea.id !== lastIdeaId) {
+    setLastIdeaId(idea.id);
     const ex = existingScores.find(s => s.scored_by === user);
     setScores({
       problem_severity: ex?.problem_severity || 5,
@@ -614,22 +630,22 @@ function ScoreModal({
     setNotes(ex?.notes || '');
   }
 
-  if (!vertical || !user) return null;
+  if (!idea || !user) return null;
 
   const handleSubmit = async () => {
     setSubmitting(true);
-    await supabase.from('vertical_scores').upsert({
-      vertical_id: vertical.id,
+    await supabase.from('idea_scores').upsert({
+      idea_id: idea.id,
       scored_by: user,
       ...scores,
       notes: notes.trim() || null,
-    }, { onConflict: 'vertical_id,scored_by' });
+    }, { onConflict: 'idea_id,scored_by' });
     setSubmitting(false);
     onClose();
   };
 
   return (
-    <Modal open={!!vertical} onClose={onClose} title={`Score: ${vertical.name}`}>
+    <Modal open={!!idea} onClose={onClose} title={`Score: ${idea.name}`}>
       <div className="space-y-4">
         <p className="text-xs text-dim">Scoring as {user}. Each criterion is 1-10.</p>
         {SCORE_CRITERIA.map(c => (
