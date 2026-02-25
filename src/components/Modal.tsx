@@ -24,7 +24,7 @@ export default function Modal({ open, onClose, title, children, wide }: ModalPro
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className={`relative bg-card border border-border rounded p-6 ${wide ? 'max-w-2xl' : 'max-w-md'} w-full mx-4 max-h-[85vh] overflow-y-auto`}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-text text-sm font-semibold">{title}</h2>

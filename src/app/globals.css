@@ -6,19 +6,19 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #27272A #09090B;
+  scrollbar-color: #D8D0C4 #FAF7F2;
 }
 
 body {
-  background: #09090B;
-  color: #FAFAFA;
+  background: #FAF7F2;
+  color: #2D2A26;
   font-family: 'Inter', system-ui, sans-serif;
 }
 
 input, textarea, select {
-  background: #111113;
-  border: 1px solid #27272A;
-  color: #FAFAFA;
+  background: #FFFFFF;
+  border: 1px solid #D8D0C4;
+  color: #2D2A26;
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 14px;
@@ -27,14 +27,14 @@ input, textarea, select {
 }
 
 input:focus, textarea:focus, select:focus {
-  border-color: #7DB4D0;
+  border-color: #6B8F71;
 }
 
 input::placeholder, textarea::placeholder {
-  color: #52525B;
+  color: #A89F93;
 }
 
 select option {
-  background: #18181B;
-  color: #FAFAFA;
+  background: #FFFFFF;
+  color: #2D2A26;
 }

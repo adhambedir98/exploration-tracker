@@ -3,6 +3,8 @@ export type TeamMember = 'Adham' | 'Aly' | 'Youssif';
 // V2 Idea Funnel
 export type IdeaStatus = 'brainstorm' | 'shortlist' | 'deep_dive' | 'killed' | 'selected';
 
+export type CompetitionLevel = 'Low' | 'Medium' | 'High';
+
 export type SignalStrength = 'strong' | 'moderate' | 'weak';
 
 export type TaskStatus = 'todo' | 'in_progress' | 'done';
@@ -22,11 +24,18 @@ export interface Idea {
   archetype_id: string | null;
   vertical: string | null;
   added_by: TeamMember;
-  tam_score: number | null;
-  competition_score: number | null;
+  // Desktop Research scores
+  tam_estimate_billions: number | null;
+  competition_level: CompetitionLevel | null;
   problem_severity_score: number | null;
   market_founder_fit_score: number | null;
-  execution_difficulty_score: number | null;
+  execution_difficulty_score: number | null; // 1=easy, 10=hard (lower is better)
+  // Talk to Users scores
+  time_to_100m_arr_months: number | null;
+  second_buyer_name: string | null;
+  second_buyer_score: number | null;
+  passion_score: number | null;
+  // Composite
   total_score: number | null;
   score_reasoning: Record<string, string> | null;
   created_at: string;

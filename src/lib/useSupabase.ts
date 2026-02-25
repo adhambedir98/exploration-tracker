@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from './supabase';
-import { Idea, IdeaScore, Archetype, ReferenceStartup, Conversation, Task, SFMeeting } from './types';
+import { Idea, IdeaScore, Archetype, ReferenceStartup, VerticalItem, Conversation, Task, SFMeeting } from './types';
 
 function useRealtimeTable<T>(
   table: string,
@@ -66,10 +66,18 @@ function useStaticTable<T>(
 
 export function useIdeas() {
   const queryFn = useCallback(async () => {
-    const { data } = await supabase.from('ideas').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('ideas').select('*').order('total_score', { ascending: false, nullsFirst: false });
     return (data || []) as Idea[];
   }, []);
   return useRealtimeTable('ideas', queryFn);
+}
+
+export function useVerticalsList() {
+  const queryFn = useCallback(async () => {
+    const { data } = await supabase.from('verticals_list').select('*').order('name');
+    return (data || []) as VerticalItem[];
+  }, []);
+  return useRealtimeTable('verticals_list', queryFn);
 }
 
 export function useIdeaScores(ideaId?: string) {

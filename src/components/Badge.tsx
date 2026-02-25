@@ -2,39 +2,39 @@
 
 const statusColors: Record<string, string> = {
   // Idea/Vertical statuses
-  brainstorm: 'bg-violet-500/15 text-violet-400',
-  longlist: 'bg-dim/20 text-dim',
+  brainstorm: 'bg-violet-100 text-violet-700',
+  longlist: 'bg-surface text-dim',
   shortlist: 'bg-accent/15 text-accent',
-  deep_dive: 'bg-amber-500/15 text-amber-400',
-  killed: 'bg-red-500/15 text-red-400',
-  selected: 'bg-emerald-500/15 text-emerald-400',
+  deep_dive: 'bg-amber-100 text-amber-700',
+  killed: 'bg-red-100 text-red-700',
+  selected: 'bg-emerald-100 text-emerald-700',
   // Task statuses
-  todo: 'bg-dim/20 text-dim',
+  todo: 'bg-surface text-dim',
   in_progress: 'bg-accent/15 text-accent',
-  done: 'bg-emerald-500/15 text-emerald-400',
+  done: 'bg-emerald-100 text-emerald-700',
   // Signal strength
-  strong: 'bg-emerald-500/15 text-emerald-400',
-  moderate: 'bg-amber-500/15 text-amber-400',
-  weak: 'bg-red-500/15 text-red-400',
+  strong: 'bg-emerald-100 text-emerald-700',
+  moderate: 'bg-amber-100 text-amber-700',
+  weak: 'bg-red-100 text-red-700',
   // Phases
   phase_1: 'bg-accent/15 text-accent',
-  phase_2: 'bg-amber-500/15 text-amber-400',
-  phase_3: 'bg-emerald-500/15 text-emerald-400',
-  parallel: 'bg-violet-500/15 text-violet-400',
+  phase_2: 'bg-amber-100 text-amber-700',
+  phase_3: 'bg-emerald-100 text-emerald-700',
+  parallel: 'bg-violet-100 text-violet-700',
   // Meeting types
   vc: 'bg-accent/15 text-accent',
-  angel: 'bg-emerald-500/15 text-emerald-400',
-  operator: 'bg-amber-500/15 text-amber-400',
-  accelerator: 'bg-violet-500/15 text-violet-400',
-  other: 'bg-dim/20 text-dim',
+  angel: 'bg-emerald-100 text-emerald-700',
+  operator: 'bg-amber-100 text-amber-700',
+  accelerator: 'bg-violet-100 text-violet-700',
+  other: 'bg-surface text-dim',
   // Meeting statuses
-  need_intro: 'bg-dim/20 text-dim',
-  intro_requested: 'bg-amber-500/15 text-amber-400',
+  need_intro: 'bg-surface text-dim',
+  intro_requested: 'bg-amber-100 text-amber-700',
   intro_made: 'bg-accent/15 text-accent',
-  scheduled: 'bg-violet-500/15 text-violet-400',
-  confirmed: 'bg-emerald-500/15 text-emerald-400',
-  completed: 'bg-emerald-500/15 text-emerald-400',
-  no_response: 'bg-red-500/15 text-red-400',
+  scheduled: 'bg-violet-100 text-violet-700',
+  confirmed: 'bg-emerald-100 text-emerald-700',
+  completed: 'bg-emerald-100 text-emerald-700',
+  no_response: 'bg-red-100 text-red-700',
 };
 
 const displayLabels: Record<string, string> = {
@@ -69,7 +69,7 @@ const displayLabels: Record<string, string> = {
 };
 
 export default function Badge({ value, className = '' }: { value: string; className?: string }) {
-  const color = statusColors[value] || 'bg-dim/20 text-dim';
+  const color = statusColors[value] || 'bg-surface text-dim';
   const label = displayLabels[value] || value;
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium ${color} ${className}`}>

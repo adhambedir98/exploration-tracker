@@ -69,8 +69,8 @@ export default function ConversationsPage() {
                   <td className="px-3 py-2.5">
                     {c.signal_strength ? (
                       <div className={`w-2 h-2 rounded-full ${
-                        c.signal_strength === 'strong' ? 'bg-emerald-400' :
-                        c.signal_strength === 'moderate' ? 'bg-amber-400' : 'bg-red-400'
+                        c.signal_strength === 'strong' ? 'bg-emerald-600' :
+                        c.signal_strength === 'moderate' ? 'bg-amber-600' : 'bg-red-600'
                       }`} title={c.signal_strength} />
                     ) : (
                       <span className="text-dim">--</span>
@@ -107,7 +107,7 @@ export default function ConversationsPage() {
                               await supabase.from('conversations').delete().eq('id', c.id);
                               setExpanded(null);
                             }}
-                            className="text-xs text-red-400 hover:text-red-300"
+                            className="text-xs text-red-600 hover:text-red-500"
                           >
                             Delete
                           </button>

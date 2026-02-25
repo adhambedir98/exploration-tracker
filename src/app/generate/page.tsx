@@ -115,13 +115,18 @@ export default function GeneratePage() {
           body: JSON.stringify({ name: idea.name, description: idea.description, vertical: idea.vertical }),
         });
         const scores = await scoreRes.json();
-        if (scoreRes.ok && scores.tam_score) {
+        if (scoreRes.ok && scores.tam_estimate_billions) {
           await supabase.from('ideas').update({
-            tam_score: scores.tam_score,
-            competition_score: scores.competition_score,
+            archetype_id: scores.archetype_id || null,
+            tam_estimate_billions: scores.tam_estimate_billions,
+            competition_level: scores.competition_level,
             problem_severity_score: scores.problem_severity_score,
             market_founder_fit_score: scores.market_founder_fit_score,
             execution_difficulty_score: scores.execution_difficulty_score,
+            time_to_100m_arr_months: scores.time_to_100m_arr_months,
+            second_buyer_name: scores.second_buyer_name,
+            second_buyer_score: scores.second_buyer_score,
+            passion_score: scores.passion_score,
             total_score: scores.total_score,
             score_reasoning: scores.reasoning || null,
           }).eq('id', inserted.id);
@@ -154,13 +159,18 @@ export default function GeneratePage() {
           body: JSON.stringify({ name: manualName.trim(), description: manualDesc.trim() }),
         });
         const scores = await scoreRes.json();
-        if (scoreRes.ok && scores.tam_score) {
+        if (scoreRes.ok && scores.tam_estimate_billions) {
           await supabase.from('ideas').update({
-            tam_score: scores.tam_score,
-            competition_score: scores.competition_score,
+            archetype_id: scores.archetype_id || null,
+            tam_estimate_billions: scores.tam_estimate_billions,
+            competition_level: scores.competition_level,
             problem_severity_score: scores.problem_severity_score,
             market_founder_fit_score: scores.market_founder_fit_score,
             execution_difficulty_score: scores.execution_difficulty_score,
+            time_to_100m_arr_months: scores.time_to_100m_arr_months,
+            second_buyer_name: scores.second_buyer_name,
+            second_buyer_score: scores.second_buyer_score,
+            passion_score: scores.passion_score,
             total_score: scores.total_score,
             score_reasoning: scores.reasoning || null,
           }).eq('id', inserted.id);
@@ -265,8 +275,8 @@ export default function GeneratePage() {
 
       {/* Error */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded p-4 mb-6">
-          <p className="text-sm text-red-400">{error}</p>
+        <div className="bg-red-100 border border-red-200 rounded p-4 mb-6">
+          <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
 
@@ -289,7 +299,7 @@ export default function GeneratePage() {
                 </div>
                 <div className="flex-shrink-0">
                   {savedIds.has(i) ? (
-                    <span className="text-xs text-emerald-400 px-3 py-1.5">Added</span>
+                    <span className="text-xs text-emerald-700 px-3 py-1.5">Added</span>
                   ) : savingIds.has(i) ? (
                     <span className="text-xs text-accent px-3 py-1.5 flex items-center gap-1">
                       <span className="w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />

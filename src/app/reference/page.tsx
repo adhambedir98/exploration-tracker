@@ -154,8 +154,8 @@ export default function ReferencePage() {
                 <td className="px-3 py-2.5">
                   {s.score ? (
                     <span className={`text-xs font-mono ${
-                      s.score >= 40 ? 'text-emerald-400' :
-                      s.score >= 30 ? 'text-amber-400' :
+                      s.score >= 40 ? 'text-emerald-700' :
+                      s.score >= 30 ? 'text-amber-700' :
                       'text-dim'
                     }`}>
                       {s.score}
