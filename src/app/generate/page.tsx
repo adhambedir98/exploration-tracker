@@ -26,8 +26,7 @@ export default function GeneratePage() {
   const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
 
   // Manual idea input
-  const [manualName, setManualName] = useState('');
-  const [manualDesc, setManualDesc] = useState('');
+  const [manualInput, setManualInput] = useState('');
   const [manualSubmitting, setManualSubmitting] = useState(false);
 
   // Add new vertical/archetype
@@ -139,47 +138,52 @@ export default function GeneratePage() {
   };
 
   const submitManualIdea = async () => {
-    if (!manualName.trim() || !user) return;
+    if (!manualInput.trim() || !user) return;
     setManualSubmitting(true);
 
-    const { data: inserted } = await supabase.from('ideas').insert({
-      name: manualName.trim(),
-      description: manualDesc.trim() || null,
-      source: 'manual',
-      status: 'brainstorm',
-      added_by: user,
-    }).select('id').single();
+    try {
+      // Send raw text to AI — it will extract name, description, vertical AND score in one go
+      const scoreRes = await fetch('/api/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw_input: manualInput.trim() }),
+      });
+      const scores = await scoreRes.json();
 
-    // Score it
-    if (inserted?.id) {
-      try {
-        const scoreRes = await fetch('/api/score', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: manualName.trim(), description: manualDesc.trim() }),
-        });
-        const scores = await scoreRes.json();
-        if (scoreRes.ok && scores.tam_estimate_billions) {
-          await supabase.from('ideas').update({
-            archetype_id: scores.archetype_id || null,
-            tam_estimate_billions: scores.tam_estimate_billions,
-            competition_level: scores.competition_level,
-            problem_severity_score: scores.problem_severity_score,
-            market_founder_fit_score: scores.market_founder_fit_score,
-            execution_difficulty_score: scores.execution_difficulty_score,
-            time_to_100m_arr_months: scores.time_to_100m_arr_months,
-            second_buyer_name: scores.second_buyer_name,
-            second_buyer_score: scores.second_buyer_score,
-            passion_score: scores.passion_score,
-            total_score: scores.total_score,
-            score_reasoning: scores.reasoning || null,
-          }).eq('id', inserted.id);
-        }
-      } catch { /* scoring failed silently */ }
-    }
+      // Insert the idea with AI-extracted name + description
+      const ideaName = scores.extracted_name || manualInput.trim().substring(0, 60);
+      const ideaDesc = scores.extracted_description || manualInput.trim();
+      const ideaVertical = scores.extracted_vertical || null;
 
-    setManualName('');
-    setManualDesc('');
+      const { data: inserted } = await supabase.from('ideas').insert({
+        name: ideaName,
+        description: ideaDesc,
+        vertical: ideaVertical,
+        source: 'manual',
+        status: 'brainstorm',
+        added_by: user,
+      }).select('id').single();
+
+      // Save scores if we got them
+      if (inserted?.id && scoreRes.ok && scores.tam_estimate_billions) {
+        await supabase.from('ideas').update({
+          archetype_id: scores.archetype_id || null,
+          tam_estimate_billions: scores.tam_estimate_billions,
+          competition_level: scores.competition_level,
+          problem_severity_score: scores.problem_severity_score,
+          market_founder_fit_score: scores.market_founder_fit_score,
+          execution_difficulty_score: scores.execution_difficulty_score,
+          time_to_100m_arr_months: scores.time_to_100m_arr_months,
+          second_buyer_name: scores.second_buyer_name,
+          second_buyer_score: scores.second_buyer_score,
+          passion_score: scores.passion_score,
+          total_score: scores.total_score,
+          score_reasoning: scores.reasoning || null,
+        }).eq('id', inserted.id);
+      }
+    } catch { /* scoring failed silently */ }
+
+    setManualInput('');
     setManualSubmitting(false);
   };
 
@@ -322,27 +326,23 @@ export default function GeneratePage() {
 
       {/* Manual Idea Input */}
       <div className="bg-card border border-border rounded p-5">
-        <h2 className="text-text text-sm font-medium mb-3">Add Idea Manually</h2>
+        <h2 className="text-text text-sm font-medium mb-2">Add Idea Manually</h2>
+        <p className="text-xs text-dim mb-3">Type any idea in any form — AI will extract the name, description, vertical, and score it automatically.</p>
         <div className="flex gap-3">
-          <input
-            value={manualName}
-            onChange={e => setManualName(e.target.value)}
-            className="flex-1"
-            placeholder="Idea name..."
-          />
-          <input
-            value={manualDesc}
-            onChange={e => setManualDesc(e.target.value)}
-            className="flex-[2]"
-            placeholder="Brief description (optional)..."
+          <textarea
+            value={manualInput}
+            onChange={e => setManualInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitManualIdea(); } }}
+            className="flex-1 h-10 min-h-[40px] max-h-32 resize-y"
+            placeholder="e.g. AI tool that reads OR schedules and auto-orders surgical supplies before they run out..."
           />
           <button
             onClick={submitManualIdea}
-            disabled={!manualName.trim() || manualSubmitting}
-            className="px-4 py-2 text-sm bg-accent/15 text-accent rounded hover:bg-accent/25 transition-colors disabled:opacity-50 flex-shrink-0 flex items-center gap-2"
+            disabled={!manualInput.trim() || manualSubmitting}
+            className="px-4 py-2 text-sm bg-accent/15 text-accent rounded hover:bg-accent/25 transition-colors disabled:opacity-50 flex-shrink-0 flex items-center gap-2 self-start"
           >
             {manualSubmitting && <span className="w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />}
-            {manualSubmitting ? 'Adding & Scoring...' : 'Submit'}
+            {manualSubmitting ? 'AI Processing...' : 'Submit'}
           </button>
         </div>
       </div>
@@ -386,7 +386,6 @@ function LoadingSkeleton() {
         <div className="h-4 w-32 bg-surface rounded mb-3" />
         <div className="flex gap-3">
           <div className="flex-1 h-10 bg-surface rounded" />
-          <div className="flex-[2] h-10 bg-surface rounded" />
           <div className="w-20 h-10 bg-surface rounded" />
         </div>
       </div>

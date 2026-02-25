@@ -272,7 +272,7 @@ export default function IdeasPage() {
 
       <div className="bg-card border border-border rounded overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1300px]">
+          <table className="w-full min-w-[1450px]">
             <thead className="border-b border-border">
               <tr>
                 <th className="text-left px-3 py-2.5 text-xs font-medium text-dim w-10">#</th>
@@ -298,14 +298,14 @@ export default function IdeasPage() {
               {sortedIdeas.map((idea, i) => (
                 <tr key={idea.id} className="border-b border-border/50 hover:bg-surface/50 transition-colors">
                   <td className="px-3 py-2.5 text-xs text-dim font-mono">{i + 1}</td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-2.5 min-w-[420px]">
                     <button
                       onClick={() => setDetailIdea(idea)}
-                      className="text-sm text-text hover:text-accent transition-colors text-left truncate max-w-[220px] block"
+                      className="text-sm text-text hover:text-accent transition-colors text-left block whitespace-normal"
                       title={idea.name}
                     >
                       {idea.description
-                        ? (idea.description.length > 50 ? idea.description.slice(0, 50) + '...' : idea.description)
+                        ? (idea.description.length > 80 ? idea.description.slice(0, 80) + '...' : idea.description)
                         : idea.name}
                     </button>
                   </td>

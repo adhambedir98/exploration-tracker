@@ -100,7 +100,7 @@ export function useArchetypes() {
 
 export function useReferenceStartups() {
   const queryFn = useCallback(async () => {
-    const { data } = await supabase.from('reference_startups').select('*').order('score', { ascending: false, nullsFirst: false });
+    const { data } = await supabase.from('reference_startups').select('*').order('score', { ascending: false, nullsFirst: false }).limit(3000);
     return (data || []) as ReferenceStartup[];
   }, []);
   return useStaticTable(queryFn);

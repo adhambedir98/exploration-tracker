@@ -14,10 +14,41 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { name, description, vertical } = body;
+  let { name, description, vertical } = body;
+  const { raw_input } = body;
+
+  // If raw_input is provided, use AI to extract name + description first
+  if (raw_input && !name) {
+    try {
+      const parseRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey!,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 500,
+          messages: [{ role: 'user', content: `Extract a clean startup idea from this raw input. Return ONLY a JSON object with "name" (short, catchy startup name, max 60 chars), "description" (1-2 sentence description of what it does), and "vertical" (industry/vertical).\n\nRaw input: ${raw_input}` }],
+          system: 'You extract and structure startup ideas from freeform text. Return only valid JSON, no markdown.',
+        }),
+      });
+      const parseData = await parseRes.json();
+      const parseText = parseData.content?.[0]?.text || '';
+      const parsed = JSON.parse(parseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+      name = parsed.name || raw_input.substring(0, 60);
+      description = parsed.description || raw_input;
+      vertical = parsed.vertical || vertical || null;
+    } catch {
+      // Fallback: use raw input directly
+      name = raw_input.substring(0, 60);
+      description = raw_input;
+    }
+  }
 
   if (!name) {
-    return NextResponse.json({ error: 'Idea name is required.' }, { status: 400 });
+    return NextResponse.json({ error: 'Idea name or raw_input is required.' }, { status: 400 });
   }
 
   // Fetch archetypes for classification
@@ -164,6 +195,9 @@ No markdown, no extra text, just the JSON object.`;
       };
 
       return NextResponse.json({
+        extracted_name: name,
+        extracted_description: description,
+        extracted_vertical: vertical || null,
         archetype_id: archetypeId,
         tam_estimate_billions: scores.tam_estimate_billions,
         competition_level: scores.competition_level,

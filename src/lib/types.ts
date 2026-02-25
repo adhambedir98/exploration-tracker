@@ -87,6 +87,7 @@ export interface ReferenceStartup {
   latest_news: string | null;
   score: number | null;
   interest: string | null;
+  is_standout: boolean;
   created_at: string;
 }
 
