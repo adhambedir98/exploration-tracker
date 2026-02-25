@@ -29,14 +29,6 @@ function scoreColor(val: number | null): string {
   return 'text-red-600';
 }
 
-function scoreBg(val: number | null): string {
-  if (val === null) return 'bg-dim/20';
-  if (val >= 8) return 'bg-emerald-500';
-  if (val >= 6) return 'bg-accent';
-  if (val >= 4) return 'bg-amber-500';
-  return 'bg-red-500';
-}
-
 function invertedScoreColor(val: number | null): string {
   if (val === null) return 'text-dim';
   if (val <= 3) return 'text-emerald-700';

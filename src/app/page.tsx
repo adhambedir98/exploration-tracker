@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useIdeas, useArchetypes } from '@/lib/useSupabase';
 import { supabase } from '@/lib/supabase';
 import { Idea, IdeaStatus } from '@/lib/types';
-import { useFilterThresholds, FUNNEL_STEPS, isScored, formatTAM, formatMonths, DEFAULT_THRESHOLDS, FilterThresholds } from '@/lib/filterConfig';
+import { useFilterThresholds, FUNNEL_STEPS, isScored, formatTAM, formatMonths, FilterThresholds } from '@/lib/filterConfig';
 import Link from 'next/link';
 
 const FUNNEL_COLORS = [
