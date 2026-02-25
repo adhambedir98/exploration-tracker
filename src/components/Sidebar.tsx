@@ -6,9 +6,9 @@ import { useUser } from '@/lib/UserContext';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: DashboardIcon },
+  { href: '/generate', label: 'Idea Generator', icon: GenerateIcon },
   { href: '/ideas', label: 'Ideas', icon: IdeasIcon },
   { href: '/reference', label: 'Reference DB', icon: ReferenceIcon },
-  { href: '/generate', label: 'AI Generator', icon: GenerateIcon },
   { href: '/conversations', label: 'Conversations', icon: ConversationsIcon },
   { href: '/tasks', label: 'Tasks', icon: TasksIcon },
   { href: '/meetings', label: 'SF Meetings', icon: MeetingsIcon },
@@ -24,7 +24,7 @@ export default function Sidebar() {
     <aside className="w-56 h-screen bg-surface border-r border-border flex flex-col fixed left-0 top-0 z-40">
       <div className="px-4 py-5 border-b border-border">
         <h1 className="text-text text-sm font-semibold tracking-tight">Exploration Tracker</h1>
-        <p className="text-dim text-xs mt-0.5">Caddy - V2</p>
+        <p className="text-dim text-xs mt-0.5">Caddy - V3</p>
       </div>
 
       <nav className="flex-1 py-3 px-2">
