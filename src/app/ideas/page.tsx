@@ -9,11 +9,11 @@ import Modal from '@/components/Modal';
 import { useSearchParams } from 'next/navigation';
 
 const SCORE_COLUMNS = [
-  { key: 'tam_score', reasoningKey: 'tam', label: 'TAM (Total Addressable Market)', short: 'TAM' },
-  { key: 'competition_score', reasoningKey: 'competition', label: 'Existing Competition', short: 'Comp' },
-  { key: 'problem_severity_score', reasoningKey: 'problem_severity', label: 'Problem Severity', short: 'Severity' },
-  { key: 'market_founder_fit_score', reasoningKey: 'market_founder_fit', label: 'Market-Founder Fit', short: 'MF Fit' },
-  { key: 'execution_difficulty_score', reasoningKey: 'execution_difficulty', label: 'Execution Difficulty', short: 'Exec' },
+  { key: 'tam_score', reasoningKey: 'tam', label: 'TAM (Total Addressable Market)', short: 'TAM', description: 'Total Addressable Market size. Higher = larger market.', ranges: '8-10: $10B+ | 6-7: $1-10B | 4-5: $500M-1B | 1-3: <$500M' },
+  { key: 'competition_score', reasoningKey: 'competition', label: 'Existing Competition', short: 'Comp', description: 'Competitive landscape. Higher = less competition, more white space.', ranges: '8-10: Blue ocean | 6-7: Moderate, clear differentiation | 4-5: Several competitors | 1-3: Extremely crowded' },
+  { key: 'problem_severity_score', reasoningKey: 'problem_severity', label: 'Problem Severity', short: 'Severity', description: 'How painful the problem is. Higher = more urgent pain point.', ranges: '8-10: Hair-on-fire problem | 6-7: Significant pain | 4-5: Moderate pain | 1-3: Nice-to-have' },
+  { key: 'market_founder_fit_score', reasoningKey: 'market_founder_fit', label: 'Market-Founder Fit', short: 'MF Fit', description: 'Fit for a team with CV/AI, healthcare ops & data infra expertise. Higher = stronger fit.', ranges: '8-10: Strong domain expertise | 6-7: Good skill overlap | 4-5: Some transferable skills | 1-3: No relevant expertise' },
+  { key: 'execution_difficulty_score', reasoningKey: 'execution_difficulty', label: 'Execution Difficulty', short: 'Exec', description: 'Ease of execution. Higher = easier to build and ship.', ranges: '8-10: MVP in weeks | 6-7: Manageable challenges | 4-5: Significant challenges | 1-3: Massive capital/regulation needed' },
 ] as const;
 
 // Funnel step filter definitions
@@ -70,6 +70,7 @@ export default function IdeasPage() {
   const [compsIdea, setCompsIdea] = useState<Idea | null>(null);
   const [rescoring, setRescoring] = useState<Set<string>>(new Set());
   const [popover, setPopover] = useState<{ ideaId: string; colKey: string; x: number; y: number } | null>(null);
+  const [showScoreGuide, setShowScoreGuide] = useState(false);
 
   // Get filter from URL or default to 'all'
   const urlFilter = searchParams.get('filter') || 'all';
@@ -268,7 +269,7 @@ export default function IdeasPage() {
                     sortDir={sortDir}
                     handleSort={handleSort}
                     center
-                    title={col.label}
+                    title={`${col.label}\n${col.description}\n${col.ranges}`}
                   />
                 ))}
                 <SortHeader field="total_score" label="Total" sortField={sortField} sortDir={sortDir} handleSort={handleSort} center />
@@ -368,14 +369,48 @@ export default function IdeasPage() {
         </div>
       </div>
 
-      {/* Score Legend */}
-      <div className="mt-4 flex items-center gap-6 text-xs text-dim">
-        <span>Score Legend:</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-emerald-400" /> 8-10 (Strong)</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-[#7DB4D0]" /> 6-7 (Good)</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-amber-400" /> 4-5 (Moderate)</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-400" /> 1-3 (Weak)</span>
-        <span className="text-dim/60 ml-2">Click any score for AI reasoning</span>
+      {/* Score Legend & Guide */}
+      <div className="mt-4 space-y-3">
+        <div className="flex items-center gap-6 text-xs text-dim">
+          <span>Score Legend:</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-emerald-400" /> 8-10 (Strong)</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-[#7DB4D0]" /> 6-7 (Good)</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-amber-400" /> 4-5 (Moderate)</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-400" /> 1-3 (Weak)</span>
+          <span className="text-dim/60 ml-2">Click any score for AI reasoning</span>
+          <button
+            onClick={() => setShowScoreGuide(g => !g)}
+            className="ml-auto text-accent/70 hover:text-accent transition-colors flex items-center gap-1"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            {showScoreGuide ? 'Hide' : 'Score'} Guide
+          </button>
+        </div>
+
+        {showScoreGuide && (
+          <div className="bg-card border border-border rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="lg:col-span-3 mb-1">
+              <p className="text-xs text-muted">Each idea is scored 1–10 across 5 criteria by AI. Scores ≥ 8 pass the funnel filter. Total is out of 50. <span className="text-dim">Hover column headers for quick descriptions.</span></p>
+            </div>
+            {SCORE_COLUMNS.map(col => (
+              <div key={col.key} className="bg-surface/50 border border-border/50 rounded-lg p-3">
+                <h4 className="text-xs font-medium text-text mb-1">{col.label}</h4>
+                <p className="text-[11px] text-muted mb-2">{col.description}</p>
+                <div className="space-y-0.5">
+                  {col.ranges.split(' | ').map((range, i) => {
+                    const colors = ['text-emerald-400', 'text-accent', 'text-amber-400', 'text-red-400'];
+                    return (
+                      <p key={i} className={`text-[10px] font-mono ${colors[i] || 'text-dim'}`}>{range}</p>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Score Reasoning Popover */}
@@ -478,6 +513,17 @@ function ScorePopover({
 
   if (!idea || !col || !reasoning) { onClose(); return null; }
 
+  // Determine which range band this score falls into
+  const getRangeBand = (val: number | null) => {
+    if (val === null) return null;
+    const ranges = col.ranges.split(' | ');
+    if (val >= 8) return ranges[0];
+    if (val >= 6) return ranges[1];
+    if (val >= 4) return ranges[2];
+    return ranges[3];
+  };
+  const rangeBand = getRangeBand(scoreVal);
+
   const left = Math.max(16, Math.min(popover.x - 160, window.innerWidth - 336));
   const top = Math.min(popover.y, window.innerHeight - 120);
 
@@ -490,9 +536,13 @@ function ScorePopover({
         </div>
         <span className="text-xs font-medium text-muted">{col.label}</span>
       </div>
-      <div className="h-1.5 bg-surface rounded-full overflow-hidden mb-3">
+      <p className="text-[10px] text-dim mb-2">{col.description}</p>
+      <div className="h-1.5 bg-surface rounded-full overflow-hidden mb-2">
         <div className={`h-full rounded-full ${scoreBg(scoreVal)}`} style={{ width: `${((scoreVal || 0) / 10) * 100}%` }} />
       </div>
+      {rangeBand && (
+        <p className={`text-[10px] font-mono mb-2 ${scoreColor(scoreVal)}`}>{rangeBand}</p>
+      )}
       <p className="text-sm text-muted leading-relaxed">{reasoning}</p>
       <div className="mt-3 pt-2 border-t border-border/50">
         <p className="text-[10px] text-dim truncate">{idea.name}</p>
