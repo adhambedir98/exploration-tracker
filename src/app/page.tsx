@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useIdeas, useArchetypes } from '@/lib/useSupabase';
 import { supabase } from '@/lib/supabase';
 import { Idea, IdeaStatus } from '@/lib/types';
@@ -401,6 +401,7 @@ function FilterSettings({
 function IdeaRow({ idea, archetypeMap, showProgressButtons }: { idea: Idea; archetypeMap: Record<string, string>; showProgressButtons?: boolean }) {
   const [updating, setUpdating] = useState(false);
   const [hovering, setHovering] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
 
   const progressTo = async (newStatus: IdeaStatus) => {
     setUpdating(true);
@@ -416,8 +417,20 @@ function IdeaRow({ idea, archetypeMap, showProgressButtons }: { idea: Idea; arch
     { value: 'killed', label: 'Kill' },
   ];
 
+  const getTooltipStyle = (): React.CSSProperties => {
+    if (!rowRef.current) return { display: 'none' };
+    const rect = rowRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const tooltipHeight = 120;
+    if (spaceBelow < tooltipHeight) {
+      return { position: 'fixed', left: rect.left, bottom: window.innerHeight - rect.top + 4, zIndex: 9999 };
+    }
+    return { position: 'fixed', left: rect.left, top: rect.bottom + 4, zIndex: 9999 };
+  };
+
   return (
     <div
+      ref={rowRef}
       className="relative flex items-center gap-3 bg-surface/30 rounded px-3 py-1.5 text-sm"
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
@@ -442,9 +455,12 @@ function IdeaRow({ idea, archetypeMap, showProgressButtons }: { idea: Idea; arch
         <Link href="/ideas?filter=all" className="text-[10px] text-accent hover:underline">View</Link>
       )}
 
-      {/* Hover Tooltip */}
+      {/* Hover Tooltip - uses fixed positioning to escape overflow containers */}
       {hovering && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-80 bg-card border border-border rounded-lg shadow-lg shadow-black/10 p-3 pointer-events-none">
+        <div
+          className="w-80 bg-card border border-border rounded-lg shadow-lg shadow-black/10 p-3 pointer-events-none"
+          style={getTooltipStyle()}
+        >
           <p className="text-xs font-medium text-text mb-1 truncate">{idea.name}</p>
           {idea.description && <p className="text-[11px] text-muted mb-2 line-clamp-2">{idea.description}</p>}
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
