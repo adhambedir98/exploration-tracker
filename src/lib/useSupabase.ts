@@ -48,10 +48,18 @@ function useStaticTable<T>(
 ) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
+  const queryFnRef = useRef(queryFn);
+  queryFnRef.current = queryFn;
+
+  const refetch = useCallback(async () => {
+    const result = await queryFnRef.current();
+    setData(result);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
-    queryFn().then(result => {
+    queryFnRef.current().then(result => {
       if (mounted) {
         setData(result);
         setLoading(false);
@@ -61,7 +69,7 @@ function useStaticTable<T>(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { data, loading };
+  return { data, setData, loading, refetch };
 }
 
 export function useIdeas() {
