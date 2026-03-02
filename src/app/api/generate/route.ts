@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -13,31 +19,36 @@ export async function POST(request: NextRequest) {
   const verticalsStr = verticals?.length ? verticals.join(', ') : 'any industry vertical';
   const archetypesStr = archetypes?.length ? archetypes.join(', ') : 'any startup archetype';
 
-  const systemPrompt = `You are an AI startup idea generator for Caddy, a startup building computer vision analytics for surgical operating rooms.
+  // Fetch existing ideas so the AI avoids duplicates
+  const { data: existingIdeas } = await supabase
+    .from('ideas')
+    .select('name, description, vertical');
 
-Caddy's core thesis: CV on existing OR cameras to track surgical workflow, detect delays, and optimize turnover. The team is exploring adjacent and related startup ideas.
+  const existingList = (existingIdeas || [])
+    .map(i => `- ${i.name}${i.description ? ': ' + i.description : ''}`)
+    .join('\n');
 
-Key context about Caddy's position:
-- Core archetype: CV/Sensors for Physical Operations
-- White space: Almost no healthcare AI startups touch surgical operations
-- Second revenue stream potential: surgical motion data for robotics companies
-- Target buyers: PE-backed ASC (Ambulatory Surgery Center) operators
-- The team has deep expertise in computer vision, healthcare operations, and data infrastructure
+  const deduplicationBlock = existingList
+    ? `\n\nEXISTING IDEAS ALREADY IN THE PIPELINE (do NOT generate ideas that overlap with, duplicate, or are minor variations of these):
+${existingList}\n`
+    : '';
 
-When generating ideas, consider:
-1. Real problems in the selected verticals that startups could solve
-2. How the selected archetype patterns could be applied
-3. Data moats and defensibility
-4. Clear buyer persona and willingness to pay
-5. Realistic paths to revenue
+  const systemPrompt = `You are an expert startup idea generator. Your job is to generate genuinely novel, specific, and actionable startup ideas based on the user's selected verticals and archetypes.
 
-Generate exactly 10 unique, creative, and specific startup ideas that sit at the intersection of the provided verticals and archetypes. Each idea should be distinct and actionable.
-
-For each idea, provide:
+CRITICAL INSTRUCTIONS:
+- Generate ideas that are DIRECTLY relevant to the selected verticals and archetypes
+- Each idea must clearly belong to one of the selected verticals AND follow one of the selected archetype patterns
+- Be creative and specific — avoid generic ideas like "AI analytics platform" or "data dashboard"
+- Think about real, unsolved problems in the selected verticals
+- Consider unique data moats, defensibility, and clear buyer personas
+- Each idea should be genuinely distinct from the others — not 10 variations of the same theme
+- Do NOT anchor on any single domain, company, or technology — treat each vertical and archetype combination fresh
+${deduplicationBlock}
+Generate exactly 10 unique startup ideas. For each idea provide:
 - name: A concise, memorable startup name (2-3 words max)
-- description: 2-3 sentence description of what the company does
-- vertical: Which vertical it targets
-- archetype: Which archetype pattern it follows
+- description: 2-3 sentence description of what the company does, who the buyer is, and why it's compelling
+- vertical: Which of the selected verticals it targets
+- archetype: Which of the selected archetype patterns it follows
 
 Return ONLY a JSON array with these 4 fields per idea. No markdown, no code fences, no explanation outside the JSON array.`;
 
@@ -55,7 +66,9 @@ Return ONLY a JSON array with these 4 fields per idea. No markdown, no code fenc
         messages: [
           {
             role: 'user',
-            content: `Generate 10 startup ideas at the intersection of these verticals: [${verticalsStr}] and these archetypes: [${archetypesStr}].`,
+            content: `Generate 10 startup ideas at the intersection of these verticals: [${verticalsStr}] and these archetypes: [${archetypesStr}].
+
+Focus on real, unsolved problems in these specific industries. Be creative and avoid obvious or generic ideas.`,
           },
         ],
         system: systemPrompt,
