@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useTasks, useIdeas } from '@/lib/useSupabase';
+import { useTasks } from '@/lib/useSupabase';
 import { useUser } from '@/lib/UserContext';
 import { supabase } from '@/lib/supabase';
-import { Task, TaskStatus, TaskPhase, TeamMember } from '@/lib/types';
-import Badge from '@/components/Badge';
+import { Task, TaskStatus, TeamMember } from '@/lib/types';
 import Modal from '@/components/Modal';
 import { formatDateET } from '@/lib/utils';
 
@@ -17,11 +16,9 @@ const COLUMNS: { status: TaskStatus; label: string }[] = [
 
 export default function TasksPage() {
   const { data: tasks, loading } = useTasks();
-  const { data: ideas } = useIdeas();
   const { user } = useUser();
 
   const [filterPerson, setFilterPerson] = useState<TeamMember | 'all'>('all');
-  const [filterPhase, setFilterPhase] = useState<TaskPhase | 'all'>('all');
   const [addOpen, setAddOpen] = useState(false);
   const [addToColumn, setAddToColumn] = useState<TaskStatus>('todo');
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -30,14 +27,16 @@ export default function TasksPage() {
   const filteredTasks = useMemo(() => {
     let filtered = [...tasks];
     if (filterPerson !== 'all') filtered = filtered.filter(t => t.assigned_to === filterPerson);
-    if (filterPhase !== 'all') filtered = filtered.filter(t => t.phase === filterPhase);
     return filtered;
-  }, [tasks, filterPerson, filterPhase]);
-
-  const ideaMap = Object.fromEntries(ideas.map(i => [i.id, i.name]));
+  }, [tasks, filterPerson]);
 
   const moveTask = async (taskId: string, newStatus: TaskStatus) => {
     await supabase.from('tasks').update({ status: newStatus }).eq('id', taskId);
+  };
+
+  const isOverdue = (dueDate: string | null) => {
+    if (!dueDate) return false;
+    return new Date(dueDate) < new Date(new Date().toDateString());
   };
 
   if (loading) return <div className="text-dim text-sm">Loading tasks...</div>;
@@ -57,32 +56,18 @@ export default function TasksPage() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-4 mb-5">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-dim">Person:</span>
-          {(['all', 'Adham', 'Aly', 'Youssif'] as const).map(p => (
-            <button
-              key={p}
-              onClick={() => setFilterPerson(p)}
-              className={`px-2 py-0.5 text-xs rounded ${filterPerson === p ? 'bg-card text-text border border-border' : 'text-dim hover:text-muted'}`}
-            >
-              {p === 'all' ? 'All' : p}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-dim">Phase:</span>
-          {(['all', 'phase_1', 'phase_2', 'phase_3', 'parallel'] as const).map(p => (
-            <button
-              key={p}
-              onClick={() => setFilterPhase(p)}
-              className={`px-2 py-0.5 text-xs rounded ${filterPhase === p ? 'bg-card text-text border border-border' : 'text-dim hover:text-muted'}`}
-            >
-              {p === 'all' ? 'All' : p === 'phase_1' ? 'P1' : p === 'phase_2' ? 'P2' : p === 'phase_3' ? 'P3' : 'Par'}
-            </button>
-          ))}
-        </div>
+      {/* Person Filter */}
+      <div className="flex items-center gap-2 mb-5">
+        <span className="text-xs text-dim">Person:</span>
+        {(['all', 'Adham', 'Aly', 'Youssif'] as const).map(p => (
+          <button
+            key={p}
+            onClick={() => setFilterPerson(p)}
+            className={`px-2 py-0.5 text-xs rounded ${filterPerson === p ? 'bg-card text-text border border-border' : 'text-dim hover:text-muted'}`}
+          >
+            {p === 'all' ? 'All' : p}
+          </button>
+        ))}
       </div>
 
       {/* Kanban Board */}
@@ -126,17 +111,15 @@ export default function TasksPage() {
                       dragTask === task.id ? 'opacity-50' : ''
                     }`}
                   >
-                    <p className="text-sm text-text mb-2">{task.title}</p>
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm text-text mb-1.5">{task.title}</p>
+                    <div className="flex items-center justify-between">
                       <span className="text-xs text-muted">{task.assigned_to}</span>
-                      <Badge value={task.phase} />
-                      {task.idea_id && ideaMap[task.idea_id] && (
-                        <span className="text-xs text-dim truncate max-w-[100px]">{ideaMap[task.idea_id]}</span>
+                      {task.due_date && (
+                        <span className={`text-xs font-mono ${isOverdue(task.due_date) && col.status !== 'done' ? 'text-red-500' : 'text-dim'}`}>
+                          {formatDateET(task.due_date, 'MMM d')}
+                        </span>
                       )}
                     </div>
-                    {task.due_date && (
-                      <p className="text-xs font-mono text-dim mt-1.5">{formatDateET(task.due_date, 'MMM d')}</p>
-                    )}
                   </div>
                 ))}
               </div>
@@ -149,7 +132,6 @@ export default function TasksPage() {
         open={addOpen || !!editTask}
         onClose={() => { setAddOpen(false); setEditTask(null); }}
         user={user}
-        ideas={ideas}
         defaultStatus={addToColumn}
         existing={editTask}
       />
@@ -158,34 +140,27 @@ export default function TasksPage() {
 }
 
 function TaskFormModal({
-  open, onClose, user, ideas, defaultStatus, existing,
+  open, onClose, user, defaultStatus, existing,
 }: {
   open: boolean;
   onClose: () => void;
   user: TeamMember | null;
-  ideas: { id: string; name: string }[];
   defaultStatus: TaskStatus;
   existing: Task | null;
 }) {
   const [title, setTitle] = useState(existing?.title || '');
-  const [description, setDescription] = useState(existing?.description || '');
   const [assignedTo, setAssignedTo] = useState<TeamMember>(existing?.assigned_to || user || 'Adham');
-  const [phase, setPhase] = useState<TaskPhase>(existing?.phase || 'phase_1');
   const [dueDate, setDueDate] = useState(existing?.due_date || '');
   const [status, setStatus] = useState<TaskStatus>(existing?.status || defaultStatus);
-  const [ideaId, setIdeaId] = useState(existing?.idea_id || '');
   const [submitting, setSubmitting] = useState(false);
 
   const [lastId, setLastId] = useState<string | null>(null);
   if ((existing?.id || null) !== lastId) {
     setLastId(existing?.id || null);
     setTitle(existing?.title || '');
-    setDescription(existing?.description || '');
     setAssignedTo(existing?.assigned_to || user || 'Adham');
-    setPhase(existing?.phase || 'phase_1');
     setDueDate(existing?.due_date || '');
     setStatus(existing?.status || defaultStatus);
-    setIdeaId(existing?.idea_id || '');
   }
 
   const handleSubmit = async () => {
@@ -194,12 +169,9 @@ function TaskFormModal({
 
     const payload = {
       title: title.trim(),
-      description: description.trim() || null,
       assigned_to: assignedTo,
-      phase,
       due_date: dueDate || null,
       status,
-      idea_id: ideaId || null,
     };
 
     if (existing) {
@@ -210,9 +182,7 @@ function TaskFormModal({
 
     setSubmitting(false);
     setTitle('');
-    setDescription('');
     setDueDate('');
-    setIdeaId('');
     onClose();
   };
 
@@ -228,11 +198,7 @@ function TaskFormModal({
       <div className="space-y-4">
         <div>
           <label className="text-xs text-dim block mb-1">Title *</label>
-          <input value={title} onChange={e => setTitle(e.target.value)} className="w-full" placeholder="Task title..." />
-        </div>
-        <div>
-          <label className="text-xs text-dim block mb-1">Description</label>
-          <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full h-16 resize-none" />
+          <input value={title} onChange={e => setTitle(e.target.value)} className="w-full" placeholder="What needs to be done?" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -244,38 +210,20 @@ function TaskFormModal({
             </select>
           </div>
           <div>
-            <label className="text-xs text-dim block mb-1">Phase</label>
-            <select value={phase} onChange={e => setPhase(e.target.value as TaskPhase)} className="w-full">
-              <option value="phase_1">Phase 1</option>
-              <option value="phase_2">Phase 2</option>
-              <option value="phase_3">Phase 3</option>
-              <option value="parallel">Parallel</option>
-            </select>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-dim block mb-1">Due Date</label>
+            <label className="text-xs text-dim block mb-1">Deadline</label>
             <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full" />
           </div>
+        </div>
+        {existing && (
           <div>
-            <label className="text-xs text-dim block mb-1">Status</label>
+            <label className="text-xs text-dim block mb-1">Stage</label>
             <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)} className="w-full">
               <option value="todo">To Do</option>
               <option value="in_progress">In Progress</option>
               <option value="done">Done</option>
             </select>
           </div>
-        </div>
-        <div>
-          <label className="text-xs text-dim block mb-1">Linked Idea</label>
-          <select value={ideaId} onChange={e => setIdeaId(e.target.value)} className="w-full">
-            <option value="">None</option>
-            {ideas.map(i => (
-              <option key={i.id} value={i.id}>{i.name}</option>
-            ))}
-          </select>
-        </div>
+        )}
         <div className="flex gap-2">
           <button
             onClick={handleSubmit}
