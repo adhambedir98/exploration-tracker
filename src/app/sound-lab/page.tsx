@@ -29,13 +29,76 @@ const STATUS_OPTIONS: { value: SoundAIStatus; label: string; color: string }[] =
 ];
 
 const SCORE_DIMS = [
-  { key: 'tam_score' as const, short: 'TAM', label: 'TAM Score', desc: 'Total addressable market size' },
-  { key: 'pain_score' as const, short: 'Pain', label: 'Pain Severity', desc: 'How badly does the customer need this?' },
-  { key: 'feasibility_score' as const, short: 'Feas', label: 'Technical Feasibility', desc: 'Can we build V1 in 6 months?' },
-  { key: 'moat_score' as const, short: 'Moat', label: 'Competitive Moat', desc: 'How defensible against Suno, ElevenLabs, etc.?' },
-  { key: 'team_fit_score' as const, short: 'Team', label: 'Team Fit', desc: 'How well does our team map to this?' },
-  { key: 'time_to_revenue_score' as const, short: 'T2Rev', label: 'Time to Revenue', desc: 'How fast to first dollar?' },
-  { key: 'passion_score' as const, short: 'Pass', label: 'Passion Score', desc: 'Would we work on this for 10 years?' },
+  {
+    key: 'tam_score' as const, short: 'TAM', label: 'TAM Score',
+    desc: 'Total addressable market size',
+    rubric: [
+      { range: '1-3', label: 'Niche', detail: 'Under $500M market' },
+      { range: '4-6', label: 'Sizable', detail: '$500M – $5B market' },
+      { range: '7-9', label: 'Large', detail: '$5B – $50B market' },
+      { range: '10', label: 'Massive', detail: '$50B+ market' },
+    ],
+  },
+  {
+    key: 'pain_score' as const, short: 'Pain', label: 'Pain Severity',
+    desc: 'How badly does the customer need this?',
+    rubric: [
+      { range: '1-3', label: 'Nice to have', detail: 'Low urgency, optional' },
+      { range: '4-6', label: 'Significant', detail: 'Real pain, workarounds exist' },
+      { range: '7-9', label: 'Acute', detail: 'Few alternatives, high urgency' },
+      { range: '10', label: 'Hair on fire', detail: 'Desperate for a solution' },
+    ],
+  },
+  {
+    key: 'feasibility_score' as const, short: 'Feas', label: 'Technical Feasibility',
+    desc: 'Can we build V1 in 6 months?',
+    rubric: [
+      { range: '1-3', label: 'Needs breakthroughs', detail: 'Fundamental R&D required' },
+      { range: '4-6', label: 'Hard but doable', detail: 'Significant engineering effort' },
+      { range: '7-9', label: 'Buildable now', detail: 'Existing models & techniques' },
+      { range: '10', label: 'Quick prototype', detail: 'Prototype in weeks' },
+    ],
+  },
+  {
+    key: 'moat_score' as const, short: 'Moat', label: 'Competitive Moat',
+    desc: 'How defensible against Suno, ElevenLabs, etc.?',
+    rubric: [
+      { range: '1-3', label: 'Crowded', detail: 'Funded incumbents compete directly' },
+      { range: '4-6', label: 'Differentiated', detail: 'Adjacent, can carve a niche' },
+      { range: '7-9', label: 'Whitespace', detail: 'No direct competitor yet' },
+      { range: '10', label: 'Structural moat', detail: 'Data, network effects, regulatory' },
+    ],
+  },
+  {
+    key: 'team_fit_score' as const, short: 'Team', label: 'Team Fit',
+    desc: 'How well does our team map to this?',
+    rubric: [
+      { range: '1-3', label: 'Poor fit', detail: 'Need extensive hiring to start' },
+      { range: '4-6', label: 'Partial fit', detail: 'Can start but skill gaps exist' },
+      { range: '7-9', label: 'Strong fit', detail: 'Relevant expertise on team' },
+      { range: '10', label: 'Perfect', detail: 'Ideal team for this problem' },
+    ],
+  },
+  {
+    key: 'time_to_revenue_score' as const, short: 'T2Rev', label: 'Time to Revenue',
+    desc: 'How fast to first dollar?',
+    rubric: [
+      { range: '1-3', label: '2+ years', detail: 'Long build before revenue' },
+      { range: '4-6', label: '6-12 months', detail: 'Moderate time to market' },
+      { range: '7-9', label: '3-6 months', detail: 'Quick go-to-market possible' },
+      { range: '10', label: '<3 months', detail: 'Revenue almost immediately' },
+    ],
+  },
+  {
+    key: 'passion_score' as const, short: 'Pass', label: 'Passion Score',
+    desc: 'Would we work on this for 10 years?',
+    rubric: [
+      { range: '1-3', label: 'Meh', detail: 'Pure business opportunity' },
+      { range: '4-6', label: 'Interested', detail: 'Intrigued but not obsessed' },
+      { range: '7-9', label: 'Excited', detail: 'Deeply motivated to solve this' },
+      { range: '10', label: 'Obsessed', detail: 'Would do it for free' },
+    ],
+  },
 ];
 
 type ScoreKey = typeof SCORE_DIMS[number]['key'];
@@ -104,6 +167,60 @@ function loadWeights(): Record<ScoreKey, number> {
     if (stored) return JSON.parse(stored);
   } catch { /* use defaults */ }
   return DEFAULT_WEIGHTS;
+}
+
+// ─── Score Tooltip Component ─────────────────────────────────────
+
+function ScoreTooltip({ dim, score, reasoning }: { dim: typeof SCORE_DIMS[number]; score: number | null; reasoning?: string }) {
+  const [open, setOpen] = useState(false);
+
+  const currentTier = score != null ? dim.rubric.find(r => {
+    const parts = r.range.split('-');
+    if (parts.length === 2) return score >= parseInt(parts[0]) && score <= parseInt(parts[1]);
+    return score === parseInt(parts[0]);
+  }) : null;
+
+  return (
+    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <div className="flex items-center gap-0.5 cursor-help">
+        <span className="text-[10px] text-dim">{dim.short}</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" className="text-dim/50">
+          <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="0.8" fill="none"/>
+          <text x="5" y="7.2" textAnchor="middle" fontSize="6" fill="currentColor" fontWeight="600">?</text>
+        </svg>
+      </div>
+      {open && (
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-white border border-border rounded-lg shadow-lg p-3 pointer-events-none">
+          <div className="text-xs font-medium text-text mb-1">{dim.label}</div>
+          <p className="text-[11px] text-muted mb-2">{dim.desc}</p>
+          <div className="space-y-1">
+            {dim.rubric.map(tier => {
+              const isActive = currentTier === tier;
+              return (
+                <div key={tier.range} className={`flex items-start gap-1.5 text-[10px] rounded px-1.5 py-0.5 ${isActive ? 'bg-accent/10 ring-1 ring-accent/30' : ''}`}>
+                  <span className={`font-mono font-bold flex-shrink-0 w-6 ${isActive ? 'text-accent' : 'text-dim'}`}>{tier.range}</span>
+                  <div>
+                    <span className={`font-medium ${isActive ? 'text-accent' : 'text-text'}`}>{tier.label}</span>
+                    <span className="text-dim ml-1">— {tier.detail}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {reasoning && (
+            <div className="mt-2 pt-2 border-t border-border/50">
+              <div className="text-[10px] text-dim font-medium mb-0.5">AI Reasoning:</div>
+              <p className="text-[10px] text-muted italic">{reasoning}</p>
+            </div>
+          )}
+          {/* Arrow */}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+            <div className="w-2 h-2 bg-white border-r border-b border-border rotate-45 -translate-y-1" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────
@@ -205,7 +322,7 @@ export default function SoundLabPage() {
 
 // ─── Section 1: Idea Canvas ──────────────────────────────────────
 
-type IdeaWithComposite = SoundAIIdea & { _composite: number | null };
+type IdeaWithComposite = SoundAIIdea & { _composite: number | null; _scoreReasoning?: Record<string, string> };
 
 function IdeaCanvasSection({ ideas, weights, user }: { ideas: IdeaWithComposite[]; weights: Record<ScoreKey, number>; user: string | null }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -248,7 +365,7 @@ function IdeaCanvasSection({ ideas, weights, user }: { ideas: IdeaWithComposite[
         </div>
       )}
 
-      <NewIdeaModal open={newModalOpen} onClose={() => setNewModalOpen(false)} user={user} />
+      <NewIdeaModal open={newModalOpen} onClose={() => setNewModalOpen(false)} user={user} weights={weights} />
     </div>
   );
 }
@@ -327,11 +444,13 @@ function IdeaCard({ idea, expanded, onToggle, weights }: { idea: IdeaWithComposi
 
           {/* Scores */}
           <div>
-            <h4 className="text-[11px] text-dim font-medium mb-2 uppercase tracking-wide">Scores (1-10)</h4>
+            <h4 className="text-[11px] text-dim font-medium mb-2 uppercase tracking-wide">Scores (1-10) <span className="font-normal normal-case">— hover for rubric</span></h4>
             <div className="grid grid-cols-7 gap-2">
               {SCORE_DIMS.map(dim => (
                 <div key={dim.key} className="text-center">
-                  <label className="text-[10px] text-dim block mb-1" title={dim.desc}>{dim.short}</label>
+                  <div className="flex justify-center mb-1">
+                    <ScoreTooltip dim={dim} score={idea[dim.key]} reasoning={idea._scoreReasoning?.[dim.key]} />
+                  </div>
                   <input
                     type="number"
                     min={1}
@@ -424,7 +543,7 @@ function EditableTextarea({ label, value, onSave, placeholder, rows }: { label: 
   );
 }
 
-function NewIdeaModal({ open, onClose, user }: { open: boolean; onClose: () => void; user: string | null }) {
+function NewIdeaModal({ open, onClose, user, weights }: { open: boolean; onClose: () => void; user: string | null; weights: Record<ScoreKey, number> }) {
   const [name, setName] = useState('');
   const [oneLiner, setOneLiner] = useState('');
   const [category, setCategory] = useState('');
@@ -432,11 +551,17 @@ function NewIdeaModal({ open, onClose, user }: { open: boolean; onClose: () => v
   const [howItWorks, setHowItWorks] = useState('');
   const [revenueModel, setRevenueModel] = useState('');
   const [saving, setSaving] = useState(false);
+  const [scoringStatus, setScoringStatus] = useState<'idle' | 'saving' | 'scoring' | 'done' | 'error'>('idle');
+  const [scoreError, setScoreError] = useState('');
 
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await supabase.from('sound_ai_ideas').insert({
+    setScoringStatus('saving');
+    setScoreError('');
+
+    // Step 1: Insert the idea
+    const { data: inserted, error: insertErr } = await supabase.from('sound_ai_ideas').insert({
       name: name.trim(),
       one_liner: oneLiner.trim() || null,
       category: category || null,
@@ -445,11 +570,84 @@ function NewIdeaModal({ open, onClose, user }: { open: boolean; onClose: () => v
       revenue_model: revenueModel || null,
       status: 'brainstorm',
       added_by: user,
-    });
+    }).select('id').single();
+
+    if (insertErr || !inserted) {
+      setSaving(false);
+      setScoringStatus('error');
+      setScoreError('Failed to save idea.');
+      return;
+    }
+
+    // Step 2: Auto-score with AI
+    setScoringStatus('scoring');
+    try {
+      const res = await fetch('/api/sound-ai-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          one_liner: oneLiner.trim() || null,
+          category: category || null,
+          target_customer: targetCustomer.trim() || null,
+          how_it_works: howItWorks.trim() || null,
+          revenue_model: revenueModel || null,
+        }),
+      });
+      const scoreData = await res.json();
+
+      if (res.ok && scoreData.scores) {
+        // Step 3: Compute composite and update
+        const tempIdea = scoreData.scores as SoundAIIdea;
+        const composite = computeComposite(tempIdea, weights);
+
+        await supabase.from('sound_ai_ideas').update({
+          ...scoreData.scores,
+          composite_score: composite,
+        }).eq('id', inserted.id);
+
+        setScoringStatus('done');
+      } else {
+        setScoringStatus('error');
+        setScoreError(scoreData.error || 'Scoring failed — you can score manually.');
+      }
+    } catch (err) {
+      setScoringStatus('error');
+      setScoreError(`Scoring failed: ${err}`);
+    }
+
     setSaving(false);
-    setName(''); setOneLiner(''); setCategory(''); setTargetCustomer(''); setHowItWorks(''); setRevenueModel('');
-    onClose();
   };
+
+  // Auto-close after scoring completes
+  useEffect(() => {
+    if (scoringStatus === 'done') {
+      const t = setTimeout(() => {
+        setName(''); setOneLiner(''); setCategory(''); setTargetCustomer(''); setHowItWorks(''); setRevenueModel('');
+        setScoringStatus('idle');
+        setScoreError('');
+        onClose();
+      }, 1000);
+      return () => clearTimeout(t);
+    }
+    if (scoringStatus === 'error') {
+      const t = setTimeout(() => {
+        setName(''); setOneLiner(''); setCategory(''); setTargetCustomer(''); setHowItWorks(''); setRevenueModel('');
+        setScoringStatus('idle');
+        setScoreError('');
+        onClose();
+      }, 2500);
+      return () => clearTimeout(t);
+    }
+  }, [scoringStatus, onClose]);
+
+  const statusMessage = {
+    idle: null,
+    saving: '💾 Saving idea...',
+    scoring: '🤖 AI is scoring your idea across 7 dimensions...',
+    done: '✅ Idea saved and scored!',
+    error: `⚠️ ${scoreError || 'Scoring failed — you can score manually on the card.'}`,
+  }[scoringStatus];
 
   return (
     <Modal open={open} onClose={onClose} title="New Sound AI Idea" wide>
@@ -487,10 +685,25 @@ function NewIdeaModal({ open, onClose, user }: { open: boolean; onClose: () => v
           <label className="text-[11px] text-dim block mb-1">How It Works</label>
           <textarea value={howItWorks} onChange={e => setHowItWorks(e.target.value)} className="w-full text-sm bg-white border border-border rounded px-3 py-2 focus:border-accent focus:outline-none resize-y" rows={3} placeholder="2-3 sentences on the product mechanics..." />
         </div>
+
+        {/* Scoring Status */}
+        {statusMessage && (
+          <div className={`text-xs px-3 py-2 rounded ${
+            scoringStatus === 'error' ? 'bg-red-50 text-red-600 border border-red-200' :
+            scoringStatus === 'done' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+            'bg-accent/5 text-accent border border-accent/20'
+          }`}>
+            {scoringStatus === 'scoring' && (
+              <span className="inline-block w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin mr-2 align-middle" />
+            )}
+            {statusMessage}
+          </div>
+        )}
+
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="text-xs px-3 py-1.5 text-muted hover:text-text">Cancel</button>
+          <button onClick={onClose} disabled={saving} className="text-xs px-3 py-1.5 text-muted hover:text-text disabled:opacity-50">Cancel</button>
           <button onClick={save} disabled={!name.trim() || saving} className="text-xs px-4 py-1.5 bg-accent/15 text-accent rounded hover:bg-accent/25 disabled:opacity-50">
-            {saving ? 'Saving...' : 'Create Idea'}
+            {saving ? (scoringStatus === 'scoring' ? 'Scoring...' : 'Saving...') : 'Create & Auto-Score'}
           </button>
         </div>
       </div>
@@ -1014,7 +1227,7 @@ function RankingDashboardSection({ ideas }: { ideas: IdeaWithComposite[] }) {
               <SortHeader col="category" label="Category" current={sortCol} asc={sortAsc} onSort={toggleSort} />
               <SortHeader col="composite" label="Score" current={sortCol} asc={sortAsc} onSort={toggleSort} />
               {SCORE_DIMS.map(d => (
-                <SortHeader key={d.key} col={d.key} label={d.short} current={sortCol} asc={sortAsc} onSort={toggleSort} />
+                <SortHeader key={d.key} col={d.key} label={d.short} current={sortCol} asc={sortAsc} onSort={toggleSort} tooltip={d.desc} />
               ))}
               <SortHeader col="status" label="Status" current={sortCol} asc={sortAsc} onSort={toggleSort} />
             </tr>
@@ -1045,7 +1258,7 @@ function RankingDashboardSection({ ideas }: { ideas: IdeaWithComposite[] }) {
                   </td>
                   {SCORE_DIMS.map(d => (
                     <td key={d.key} className="px-3 py-2">
-                      <span className={`text-xs font-medium ${getScoreColor(idea[d.key])}`}>{idea[d.key] ?? '—'}</span>
+                      <RankingScoreCell dim={d} score={idea[d.key]} />
                     </td>
                   ))}
                   <td className="px-3 py-2">
@@ -1061,12 +1274,39 @@ function RankingDashboardSection({ ideas }: { ideas: IdeaWithComposite[] }) {
   );
 }
 
-function SortHeader({ col, label, current, asc, onSort }: { col: SortCol; label: string; current: SortCol; asc: boolean; onSort: (col: SortCol) => void }) {
+function RankingScoreCell({ dim, score }: { dim: typeof SCORE_DIMS[number]; score: number | null }) {
+  const [hover, setHover] = useState(false);
+
+  const currentTier = score != null ? dim.rubric.find(r => {
+    const parts = r.range.split('-');
+    if (parts.length === 2) return score >= parseInt(parts[0]) && score <= parseInt(parts[1]);
+    return score === parseInt(parts[0]);
+  }) : null;
+
+  return (
+    <div className="relative inline-block" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <span className={`text-xs font-medium cursor-help ${getScoreColor(score)}`}>{score ?? '—'}</span>
+      {hover && score != null && currentTier && (
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 bg-white border border-border rounded-lg shadow-lg p-2 pointer-events-none">
+          <div className="text-[10px] font-medium text-text">{dim.label}: {score}/10</div>
+          <div className="text-[10px] text-accent font-medium mt-0.5">{currentTier.label}</div>
+          <div className="text-[10px] text-muted">{currentTier.detail}</div>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+            <div className="w-2 h-2 bg-white border-r border-b border-border rotate-45 -translate-y-1" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SortHeader({ col, label, current, asc, onSort, tooltip }: { col: SortCol; label: string; current: SortCol; asc: boolean; onSort: (col: SortCol) => void; tooltip?: string }) {
   const active = current === col;
   return (
     <th
       onClick={() => onSort(col)}
       className={`text-left px-3 py-2.5 text-xs font-medium cursor-pointer select-none transition-colors ${active ? 'text-accent' : 'text-dim hover:text-muted'}`}
+      title={tooltip}
     >
       {label}
       {active && <span className="ml-0.5">{asc ? '↑' : '↓'}</span>}
