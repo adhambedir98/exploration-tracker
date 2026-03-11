@@ -133,3 +133,70 @@ export interface SFMeeting {
   notes: string | null;
   created_at: string;
 }
+
+// Sound AI Lab types
+export type SoundAICategory =
+  | 'Film & TV Scoring'
+  | 'Game Audio'
+  | 'Commercial/Venue Music'
+  | 'Podcast & YouTube'
+  | 'Advertising & Marketing'
+  | 'Music Production Tools'
+  | 'Sound Effects & Foley'
+  | 'Voice & Vocal'
+  | 'Spatial/Immersive Audio'
+  | 'Education & Training'
+  | 'Other';
+
+export type SoundAIRevenueModel =
+  | 'SaaS Subscription'
+  | 'Per-Generation / Usage-Based'
+  | 'Marketplace (take rate)'
+  | 'API Licensing'
+  | 'Enterprise Contracts'
+  | 'Freemium + Upsell'
+  | 'Hardware + Software Bundle';
+
+export type SoundAIStatus = 'brainstorm' | 'researching' | 'validating' | 'building' | 'killed';
+
+export interface SoundAIIdea {
+  id: string;
+  name: string;
+  one_liner: string | null;
+  category: string | null;
+  target_customer: string | null;
+  how_it_works: string | null;
+  revenue_model: string | null;
+  competitors: string | null;
+  differentiation: string | null;
+  tam_score: number | null;
+  pain_score: number | null;
+  feasibility_score: number | null;
+  moat_score: number | null;
+  team_fit_score: number | null;
+  time_to_revenue_score: number | null;
+  passion_score: number | null;
+  composite_score: number | null;
+  status: SoundAIStatus;
+  notes: string | null;
+  added_by: string | null;
+  created_at: string;
+}
+
+export interface SoundAIThesis {
+  id: string;
+  version: number;
+  content: string;
+  updated_by: string | null;
+  created_at: string;
+}
+
+export interface SoundAICompetitor {
+  id: string;
+  company: string;
+  focus: string | null;
+  funding: string | null;
+  key_product: string | null;
+  gap_opportunity: string | null;
+  created_at: string;
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from './supabase';
-import { Idea, IdeaScore, Archetype, ReferenceStartup, VerticalItem, Conversation, Task, SFMeeting } from './types';
+import { Idea, IdeaScore, Archetype, ReferenceStartup, VerticalItem, Conversation, Task, SFMeeting, SoundAIIdea, SoundAIThesis, SoundAICompetitor } from './types';
 
 function useRealtimeTable<T>(
   table: string,
@@ -154,4 +154,29 @@ export function useSFMeetings() {
     return (data || []) as SFMeeting[];
   }, []);
   return useRealtimeTable('sf_meetings', queryFn);
+}
+
+// Sound AI Lab hooks
+export function useSoundAIIdeas() {
+  const queryFn = useCallback(async () => {
+    const { data } = await supabase.from('sound_ai_ideas').select('*').order('composite_score', { ascending: false, nullsFirst: false });
+    return (data || []) as SoundAIIdea[];
+  }, []);
+  return useRealtimeTable('sound_ai_ideas', queryFn);
+}
+
+export function useSoundAIThesis() {
+  const queryFn = useCallback(async () => {
+    const { data } = await supabase.from('sound_ai_thesis').select('*').order('version', { ascending: false });
+    return (data || []) as SoundAIThesis[];
+  }, []);
+  return useRealtimeTable('sound_ai_thesis', queryFn);
+}
+
+export function useSoundAICompetitors() {
+  const queryFn = useCallback(async () => {
+    const { data } = await supabase.from('sound_ai_competitors').select('*').order('created_at');
+    return (data || []) as SoundAICompetitor[];
+  }, []);
+  return useRealtimeTable('sound_ai_competitors', queryFn);
 }
