@@ -10,9 +10,6 @@ const navItems = [
   { href: '/ideas', label: 'Ideas', icon: IdeasIcon },
   { href: '/sound-lab', label: 'Sound AI Lab', icon: SoundLabIcon },
   { href: '/reference', label: 'Reference DB', icon: ReferenceIcon },
-  { href: '/conversations', label: 'Conversations', icon: ConversationsIcon },
-  { href: '/tasks', label: 'Tasks', icon: TasksIcon },
-  { href: '/meetings', label: 'SF Meetings', icon: MeetingsIcon },
 ];
 
 export default function Sidebar() {
@@ -102,23 +99,6 @@ function GenerateIcon({ active }: { active: boolean }) {
   );
 }
 
-function ConversationsIcon({ active }: { active: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-accent' : 'text-dim'}>
-      <path d="M2 3h12v8H5l-3 3V3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function TasksIcon({ active }: { active: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-accent' : 'text-dim'}>
-      <rect x="1" y="2" width="14" height="12" rx="1" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M5 2v12M10 2v12" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
 function SoundLabIcon({ active }: { active: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-accent' : 'text-dim'}>
@@ -127,11 +107,3 @@ function SoundLabIcon({ active }: { active: boolean }) {
   );
 }
 
-function MeetingsIcon({ active }: { active: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-accent' : 'text-dim'}>
-      <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
