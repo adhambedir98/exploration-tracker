@@ -43,6 +43,21 @@ export default function Sidebar() {
             </Link>
           );
         })}
+
+        <div className="border-t border-border mt-2 pt-2">
+          <a
+            href="https://yc-trends-2025-2026.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2.5 px-3 py-2 rounded text-sm transition-colors mb-0.5 text-muted hover:text-text hover:bg-card/50"
+          >
+            <YCTrendsIcon />
+            <span>YC Trends</span>
+            <svg width="10" height="10" viewBox="0 0 10 10" className="text-dim ml-auto">
+              <path d="M3 1h6v6M9 1L4 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            </svg>
+          </a>
+        </div>
       </nav>
 
       <div className="p-3 border-t border-border">
@@ -95,6 +110,14 @@ function GenerateIcon({ active }: { active: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-accent' : 'text-dim'}>
       <path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.5 3.5l2 2M10.5 10.5l2 2M12.5 3.5l-2 2M5.5 10.5l-2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function YCTrendsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-dim">
+      <path d="M2 12l4-5 3 3 5-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
